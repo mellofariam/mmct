@@ -1,0 +1,14 @@
+name: my_project_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - openmm
+  - biopython
+  - pdbfixer
+  - pycifrw            # provides CifFile / ReadCif
+  - pandas
+  - pip
+  - pip:
+      - my_project     # install your local package via pip (optional if editable install is preferred)
