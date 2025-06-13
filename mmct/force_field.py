@@ -200,8 +200,64 @@ def _process_angles(
             flat_bottom_xml,
             "expression",
             attrib={
-                "expr": " Ka * ((theta1 - theta)^2 * step(theta1 - theta) + (theta - theta2)^2 * step(theta-theta2))"
+                "expr": "Ka * ((theta1 - theta)^2 * step(theta1 - theta) + (theta - theta2)^2 * step(theta-theta2))"
             },
         )
+        ET.SubElement(flat_bottom_xml, "parameter").text = "Ka"
+        ET.SubElement(flat_bottom_xml, "parameter").text = "theta1"
+        ET.SubElement(flat_bottom_xml, "parameter").text = "theta2"
 
-    return pandas.DataFrame(angles_converted_to_reference)
+        for _, row in merged_angles.iterrows():
+
+            theta1 = min(row["th0(deg)_1"], row["th0(deg)_2"])
+            theta2 = max(row["th0(deg)_1"], row["th0(deg)_2"])
+
+            ET.SubElement(
+                flat_bottom_xml,
+                "interaction",
+                attrib={
+                    "i": str(row["ai"]),
+                    "j": str(row["aj"]),
+                    "k": str(row["ak"]),
+                    "Ka": f"{row["Ka"]:.5e}",
+                    "theta1": f"{theta1:.5e}",
+                    "theta2": f"{theta2:.5e}",
+                },
+            )
+
+        del multibasin_top["angles"]
+        return multibasin_top, multibasin_xml
+    else:
+        raise ValueError(
+            f"Unknown mode for angles: {mode_angles}. "
+            "Supported modes are 'middle' and 'flat_bottom'."
+        )
+
+
+def _process_bonds(
+    reference_top: dict[str, pandas.DataFrame],
+    additional_top: dict[str, pandas.DataFrame],
+    multibasin_top: dict[str, pandas.DataFrame],
+    idx_from_additional_to_reference: dict[int, int],
+    multibasin_xml: ET.ElementTree,
+):
+    """
+    Processes bonds from the reference and additional topologies,
+    converting them to the reference indices and merging them.
+    The final bonds are averages of the equilibrium length in both
+    structures.
+    """
+
+    bonds_converted_to_reference = {
+        col: [] for col in additional_top["bonds"].columns
+    }
+
+    reference_root = multibasin_xml.getroot()
+
+    for _, row in additional_top["bonds"].iterrows():
+
+        i = idx_from_additional_to_reference.get(row["ai"])
+        j = idx_from_additional_to_reference.get(row["aj"])
+
+        if i is not None and j is not None:
+            bonds_converted_to_reference)
