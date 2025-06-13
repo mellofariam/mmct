@@ -118,8 +118,8 @@ def _process_angles(
     multibasin_top: dict[str, pandas.DataFrame],
     idx_from_additional_to_reference: dict[int, int],
     multibasin_xml: ET.ElementTree,
-    mode_angles: str,
-):
+    mode: str = "middle",
+) -> tuple[dict[str, pandas.DataFrame], ET.ElementTree]:
     """
     Processes angles from the reference and additional topologies,
     converting them to the reference indices and merging them.
@@ -179,7 +179,7 @@ def _process_angles(
         merged_angles["_merge"] == "right_only", "th0(deg)_2"
     ]
 
-    if mode_angles == "middle":
+    if mode == "middle":
         merged_angles["th0(deg)"] = np.nanmean(
             merged_angles[["th0(deg)_1", "th0(deg)_2"]],
             axis=1,
@@ -191,7 +191,7 @@ def _process_angles(
 
         return multibasin_top, multibasin_xml
 
-    elif mode_angles == "flat_bottom":
+    elif mode == "flat_bottom":
         angles_xml = ET.SubElement(reference_root, "angles")
         flat_bottom_xml = ET.SubElement(
             angles_xml, "angles_type", attrib={"name": "flat_bottom"}
@@ -229,7 +229,7 @@ def _process_angles(
         return multibasin_top, multibasin_xml
     else:
         raise ValueError(
-            f"Unknown mode for angles: {mode_angles}. "
+            f"Unknown mode for angles: {mode}. "
             "Supported modes are 'middle' and 'flat_bottom'."
         )
 
@@ -861,25 +861,21 @@ def define_multibasin_model(
     reference_xml: str,
     additional_top: dict[str, pandas.DataFrame],
     additional_xml: str,
-    idx_from_reference_to_additional: dict[int, int],
     idx_from_additional_to_reference: dict[int, int],
     mode_angles: str = "middle",
-    xmlfile: str = "smog.xml",
-    topfile: str = "smog.top",
+    mode_contacts: str = "CG",
+    xml_file: str = "smog.xml",
+    top_file: str = "smog.top",
+    contact_file: str = "contacts.pkl",
 ) -> dict[str, pandas.DataFrame]:
     """
     Updates the dihedrals and angles from the reference topology to the middle value between the two topologies.
     """
 
     multibasin_top = reference_top.copy()
-    additional_top_in_reference_idx = {}
 
     reference_xml = ET.parse(reference_xml)
-    reference_root = reference_xml.getroot()
-
     additional_xml = ET.parse(additional_xml)
-    additional_root = additional_xml.getroot()
-
     multibasin_xml = copy.deepcopy(reference_xml)
 
     # For the angles
@@ -914,14 +910,17 @@ def define_multibasin_model(
 
     # For the contacts
 
-    multibasin_xml = _process_contacts(
+    multibasin_xml, df_contacts = _process_contacts(
         reference_xml,
         additional_xml,
         multibasin_xml,
         idx_from_additional_to_reference,
+        mode_contacts,
     )
 
-    save_top(multibasin_top, topfile)
-    save_xml(multibasin_xml, xmlfile)
+    save_top(multibasin_top, top_file)
+    save_xml(multibasin_xml, xml_file)
 
-    return multibasin_top, multibasin_xml
+    df_contacts.to_pickle(contact_file)
+
+    return multibasin_top, multibasin_xml, df_contacts
