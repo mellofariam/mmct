@@ -114,30 +114,23 @@ def save_xml(
 
 def _process_angles(
     reference_top: dict[str, pandas.DataFrame],
-    reference_xml: str,
     additional_top: dict[str, pandas.DataFrame],
-    additional_xml: str,
-    idx_from_reference_to_additional: dict[int, int],
+    multibasin_top: dict[str, pandas.DataFrame],
     idx_from_additional_to_reference: dict[int, int],
-    mode_angles: str = "middle",
-) -> dict[str, pandas.DataFrame]:
+    multibasin_xml: ET.ElementTree,
+    mode_angles: str,
+):
     """
-    Updates the dihedrals and angles from the reference topology to the middle value between the two topologies.
+    Processes angles from the reference and additional topologies,
+    converting them to the reference indices and merging them.
+    The angles are either averaged or converted to a flat-bottom potential.
     """
 
-    multibasin_top = reference_top.copy()
-    additional_top_in_reference_idx = {}
-
-    reference_xml = ET.parse(reference_xml)
-    reference_root = reference_xml.getroot()
-
-    additional_xml = ET.parse(additional_xml)
-    additional_root = additional_xml.getroot()
-
-    # For the angles
     angles_converted_to_reference = {
         col: [] for col in additional_top["angles"].columns
     }
+
+    reference_root = multibasin_xml.getroot()
 
     for _, row in additional_top["angles"].iterrows():
 
@@ -155,9 +148,19 @@ def _process_angles(
             )
             angles_converted_to_reference["Ka"].append(row["Ka"])
 
+    df_angles_additional = pandas.DataFrame(
+        data=angles_converted_to_reference
+    )
+    df_angles_additional[["ai", "aj", "ak", "func"]] = (
+        df_angles_additional[["ai", "aj", "ak", "func"]].astype(int)
+    )
+    df_angles_additional[["th0(deg)", "Ka"]] = df_angles_additional[
+        ["th0(deg)", "Ka"]
+    ].astype(float)
+
     merged_angles = pandas.merge(
         reference_top["angles"],
-        additional_top,
+        df_angles_additional,
         left_on=["ai", "aj", "ak", "func", "Ka"],
         right_on=["ai", "aj", "ak", "func", "Ka"],
         how="outer",
@@ -173,7 +176,7 @@ def _process_angles(
     merged_angles.loc[
         merged_angles["_merge"] == "right_only", "th0(deg)_1"
     ] = merged_angles.loc[
-        merged_angles["_merge"] == "left_only", "th0(deg)_2"
+        merged_angles["_merge"] == "right_only", "th0(deg)_2"
     ]
 
     if mode_angles == "middle":
@@ -185,6 +188,8 @@ def _process_angles(
         multibasin_top["angles"] = merged_angles[
             ["ai", "aj", "ak", "func", "th0(deg)", "Ka"]
         ].reset_index(drop=True)
+
+        return multibasin_top, multibasin_xml
 
     elif mode_angles == "flat_bottom":
         angles_xml = ET.SubElement(reference_root, "angles")
