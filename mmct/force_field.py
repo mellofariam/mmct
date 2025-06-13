@@ -786,6 +786,76 @@ def _process_contacts(
     return multibasin_xml, pandas.DataFrame(contact_information)
 
 
+def scale_contacts(
+    xml: ET.ElementTree,
+    atom_pairs: np.ndarray,
+    scale_by: float = 1.0,
+) -> ET.ElementTree:
+    """
+    Scales the contact strength in the XML file by a given scale factor.
+
+    Args:
+        xml (ET.ElementTree): The XML tree containing contact information.
+        atom_pairs (np.ndarray): Array of atom pairs for which contacts are defined.
+        scale_by (float): Factor by which to scale the contact distances.
+
+    Returns:
+        ET.ElementTree: The modified XML tree with scaled contacts.
+    """
+    root = xml.getroot()
+
+    for contact_type in root.findall(".//contacts/contacts_type"):
+        for interaction in contact_type.findall("interaction"):
+            i = int(interaction.attrib["i"])
+            j = int(interaction.attrib["j"])
+
+            if (i, j) in atom_pairs or (j, i) in atom_pairs:
+                interaction.attrib["A"] = (
+                    f"{scale_by * float(interaction.attrib['A']):.5e}"
+                )
+                interaction.attrib["B"] = (
+                    f"{scale_by * float(interaction.attrib['B']):.5e}"
+                )
+
+    return xml
+
+
+def delete_contacts(
+    xml: ET.ElementTree,
+    atom_pairs: np.ndarray,
+) -> ET.ElementTree:
+    """
+    Deletes contacts in the XML file for specified atom pairs.
+
+    Args:
+        xml (ET.ElementTree): The XML tree containing contact information.
+        atom_pairs (np.ndarray): A 2D NumPy array of integer pairs, where each pair represents the indices of atoms whose contacts should be deleted.
+
+    Returns:
+        ET.ElementTree: The modified XML tree with specified contacts removed.
+    """
+    root = xml.getroot()
+
+    for contact_type in root.findall(".//contacts/contacts_type"):
+        elements_to_keep = []
+        for element in contact_type:
+            if element.tag != "interaction":
+                elements_to_keep.append(element)
+            else:
+                i = int(element.attrib["i"])
+                j = int(element.attrib["j"])
+
+                if (i, j) not in atom_pairs and (
+                    j,
+                    i,
+                ) not in atom_pairs:
+                    elements_to_keep.append(element)
+
+        contact_type[:] = elements_to_keep
+
+    return xml
+
+
 def define_multibasin_model(
     reference_top: dict[str, pandas.DataFrame],
     reference_xml: str,
