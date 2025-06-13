@@ -1,6 +1,8 @@
-import pandas
-import numpy as np
+import copy
 import xml.etree.cElementTree as ET
+
+import numpy as np
+import pandas
 
 
 def read_top(topfile: str) -> dict[str, pandas.DataFrame]:
@@ -66,7 +68,51 @@ def read_top(topfile: str) -> dict[str, pandas.DataFrame]:
     return ff_params
 
 
-def define_multibasin_model(
+def save_top(
+    top: dict[str, pandas.DataFrame], topfile: str = "top.top"
+) -> None:
+    """
+    Saves force field parameters to a GROMACS topology file.
+
+    Args:
+        top (dict): A dictionary containing force field parameters.
+        topfile (str): Path to the output GROMACS topology file.
+    """
+
+    def format_entry(val):
+        if isinstance(val, int):
+            return str(val)
+        elif isinstance(val, float):
+            return f"{val:.9e}"
+        else:
+            return str(val)
+
+    with open(topfile, "w") as f:
+        for section, df in top.items():
+            f.write(f"[{section}]\n")
+            f.write("; " + "\t".join(df.columns) + "\n")
+            for row in df.itertuples(index=False):
+                f.write(
+                    "\t".join(format_entry(x) for x in row) + "\n"
+                )
+            f.write("\n")
+
+
+def save_xml(
+    xml_tree: ET.ElementTree, xmlfile: str = "top.xml"
+) -> None:
+    """
+    Saves an XML tree to a file.
+
+    Args:
+        xml_tree (ET.ElementTree): The XML tree to save.
+        xmlfile (str): Path to the output XML file.
+    """
+    ET.indent(xml_tree, space=" ")
+    xml_tree.write(xmlfile)
+
+
+def _process_angles(
     reference_top: dict[str, pandas.DataFrame],
     reference_xml: str,
     additional_top: dict[str, pandas.DataFrame],
