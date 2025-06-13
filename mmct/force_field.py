@@ -539,12 +539,48 @@ def _process_contacts(
     additional_xml: ET.ElementTree,
     multibasin_xml: ET.ElementTree,
     idx_from_additional_to_reference: dict[int, int],
-) -> ET.ElementTree:
+    mode="CG",
+) -> tuple[ET.ElementTree, pandas.DataFrame]:
     """
     Processes contacts from the reference and additional XML files,
     converting them to the reference indices and merging them.
     The final contacts are averages of the parameters in both structures.
     """
+
+    if mode == "CG":
+        EPSILON = 1.0
+        POW_ATTRACTION = 10
+        COEFF_ATTRACTION = 6
+        POW_REPULSION = 12
+        COEFF_REPULSION = 5
+    elif mode == "AA":
+        EPSILON = 0.5
+        POW_ATTRACTION = 6
+        COEFF_ATTRACTION = 2
+        POW_REPULSION = 12
+        COEFF_REPULSION = 1
+
+    else:
+        raise ValueError(
+            f"Unknown mode for contacts: {mode}. "
+            "Supported modes are 'CG' and 'AA'."
+        )
+
+    def contact_energy(r, sigma):
+        return EPSILON * (
+            COEFF_REPULSION * (sigma / r) ** POW_REPULSION
+            - COEFF_ATTRACTION * (sigma / r) ** POW_ATTRACTION
+        )
+
+    def isoenergetic_distance(r1, r2):
+        return (
+            COEFF_ATTRACTION
+            / COEFF_REPULSION
+            * (
+                (1 / r1**POW_ATTRACTION - 1 / r2**POW_ATTRACTION)
+                / (1 / r1**POW_REPULSION - 1 / r2**POW_REPULSION)
+            )
+        ) ** (1 / (POW_REPULSION - POW_ATTRACTION))
 
     reference_root = reference_xml.getroot()
     additional_root = additional_xml.getroot()
@@ -587,6 +623,12 @@ def _process_contacts(
         float
     )
     df_additional[["i", "j"]] = df_additional[["i", "j"]].astype(int)
+    df_additional["distance"] = (
+        df_additional["A"]
+        / df_additional["B"]
+        * COEFF_ATTRACTION
+        / COEFF_REPULSION
+    ) ** (1 / (POW_REPULSION - POW_ATTRACTION))
 
     contacts_in_reference = {"i": [], "j": [], "A": [], "B": []}
     for dihedral_type in reference_root.findall(
@@ -601,43 +643,117 @@ def _process_contacts(
     df_reference = pandas.DataFrame(data=contacts_in_reference)
     df_reference[["A", "B"]] = df_reference[["A", "B"]].astype(float)
     df_reference[["i", "j"]] = df_reference[["i", "j"]].astype(int)
+    df_reference["sigma"] = (
+        df_reference["A"]
+        / df_reference["B"]
+        * COEFF_ATTRACTION
+        / COEFF_REPULSION
+    ) ** (1 / (POW_REPULSION - POW_ATTRACTION))
 
-    # Merge the two DataFrames on i, j
-
-    merged_contacts = pandas.merge(
-        df_reference,
-        df_additional,
-        on=["i", "j"],
-        how="outer",
-        suffixes=("_1", "_2"),
-        indicator=True,
+    df_reference["epsilon"] = (
+        df_reference["A"]
+        / COEFF_REPULSION
+        * df_reference["sigma"] ** -POW_REPULSION
     )
 
-    merged_contacts.loc[
-        merged_contacts["_merge"] == "left_only", "theta0_2"
-    ] = merged_contacts.loc[
-        merged_contacts["_merge"] == "left_only", "theta0_1"
-    ]
-    merged_contacts.loc[
-        merged_contacts["_merge"] == "right_only", "theta0_1"
-    ] = merged_contacts.loc[
-        merged_contacts["_merge"] == "right_only", "theta0_2"
-    ]
+    if not np.isclose(
+        np.nanmean(df_reference["epsilon"]), EPSILON, atol=0.01
+    ):
+        raise ValueError(
+            "Contacts do not have the expected epsilon value. "
+            f"Expected: {EPSILON}, Found: {np.nanmean(df_reference['epsilon'])}"
+            "Make sure to choose the correct mode (CG or AA)."
+        )
 
-    merged_contacts["theta0"] = _angular_midpoint(
-        merged_contacts["theta0_1"].values,
-        merged_contacts["theta0_2"].values,
-    )
+    if mode == "CG":
+
+        # Merge the two DataFrames on i, j
+        merged_contacts = pandas.merge(
+            df_reference,
+            df_additional,
+            on=["i", "j"],
+            how="outer",
+            suffixes=("_1", "_2"),
+            indicator=True,
+        )  # this identifies common contacts, both called by ShadowMap
+
+        # contacts only on reference
+        merged_contacts.loc[
+            merged_contacts["_merge"] == "left_only", "sigma_iso"
+        ] = merged_contacts.loc[
+            merged_contacts["_merge"] == "left_only", "sigma_1"
+        ]
+        merged_contacts.loc[
+            merged_contacts["_merge"] == "left_only", "sigma_2"
+        ] = merged_contacts.loc[
+            merged_contacts["_merge"] == "left_only", "sigma_1"
+        ]
+
+        # contacts only on additional
+        merged_contacts.loc[
+            merged_contacts["_merge"] == "right_only", "sigma_iso"
+        ] = merged_contacts.loc[
+            merged_contacts["_merge"] == "right_only", "sigma_2"
+        ]
+        merged_contacts.loc[
+            merged_contacts["_merge"] == "right_only", "sigma_1"
+        ] = merged_contacts.loc[
+            merged_contacts["_merge"] == "right_only", "sigma_2"
+        ]
+
+        # common contacts
+        merged_contacts.loc[
+            merged_contacts["_merge"] == "both", "sigma_iso"
+        ] = isoenergetic_distance(
+            merged_contacts.loc[
+                merged_contacts["_merge"] == "both", "sigma_1"
+            ],
+            merged_contacts.loc[
+                merged_contacts["_merge"] == "both", "sigma_2"
+            ],
+        )
+
+        merged_contacts["epsilon_iso"] = np.abs(
+            contact_energy(
+                merged_contacts["sigma_1"],
+                merged_contacts["sigma_iso"],
+            )
+        )
+
+        # for the cases where the eps_iso/eps < 0.5, go back to the lower distance
+        merged_contacts.loc[
+            merged_contacts["epsilon_iso"] < 0.5 * EPSILON,
+            "sigma_iso",
+        ] = merged_contacts.loc[
+            merged_contacts["epsilon_iso"] < 0.5 * EPSILON, "sigma_1"
+        ]
+
+        merged_contacts["A"] = (
+            EPSILON
+            * COEFF_REPULSION
+            * merged_contacts["sigma_iso"] ** POW_REPULSION
+        )
+        merged_contacts["B"] = (
+            EPSILON
+            * COEFF_ATTRACTION
+            * merged_contacts["sigma_iso"] ** POW_ATTRACTION
+        )
 
     ## replace new contacts in the mutlibasin_xml
+    contact_information = {
+        "i": [],
+        "j": [],
+        "distance": [],
+        "source": [],
+    }
 
-    for dihedral_type in multibasin_root.findall(
+    for contact_type in multibasin_root.findall(
         ".//contacts/contacts_type"
     ):
         # 1) Build a new list of just the non-interaction children
         edited_contacts = [
             element
-            for element in dihedral_type
+            for element in contact_type
             if element.tag != "interaction"
         ]
 
@@ -649,23 +765,25 @@ def _process_contacts(
                     attrib={
                         "i": str(row.i),
                         "j": str(row.j),
-                        "k": str(row.k),
-                        "l": str(row.l),
-                        "theta0": f"{row.theta0:.5e}",
-                        "weight": (
-                            f"{row.weight:.5e}"
-                            if row.weight != 1
-                            else "1"
-                        ),
-                        "multiplicity": str(row.multiplicity),
+                        "A": f"{row.A:.5e}",
+                        "B": f"{row.B:.5e}",
                     },
                 )
             )
+            contact_information["i"].append(row.i)
+            contact_information["j"].append(row.j)
+            contact_information["distance"].append(row.sigma_iso)
+            if row._merge == "left_only":
+                contact_information["source"].append("left")
+            elif row._merge == "right_only":
+                contact_information["source"].append("right")
+            else:
+                contact_information["source"].append("common")
 
         # 3) In one go, reassign the children of dihedral_type
         dihedral_type[:] = edited_contacts
 
-    return multibasin_xml
+    return multibasin_xml, pandas.DataFrame(contact_information)
 
 
 def define_multibasin_model(
