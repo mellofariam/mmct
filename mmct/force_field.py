@@ -165,18 +165,18 @@ def _process_angles(
         right_on=["ai", "aj", "ak", "func", "Ka"],
         how="outer",
         suffixes=("_1", "_2"),
-        indicator=True,
+        indicator="source",
     )
 
     merged_angles.loc[
-        merged_angles["_merge"] == "left_only", "th0(deg)_2"
+        merged_angles["source"] == "left_only", "th0(deg)_2"
     ] = merged_angles.loc[
-        merged_angles["_merge"] == "left_only", "th0(deg)_1"
+        merged_angles["source"] == "left_only", "th0(deg)_1"
     ]
     merged_angles.loc[
-        merged_angles["_merge"] == "right_only", "th0(deg)_1"
+        merged_angles["source"] == "right_only", "th0(deg)_1"
     ] = merged_angles.loc[
-        merged_angles["_merge"] == "right_only", "th0(deg)_2"
+        merged_angles["source"] == "right_only", "th0(deg)_2"
     ]
 
     if mode == "middle":
@@ -285,18 +285,18 @@ def _process_bonds(
         right_on=["ai", "aj", "func", "Kb"],
         how="outer",
         suffixes=("_1", "_2"),
-        indicator=True,
+        indicator="source",
     )
 
     merged_bonds.loc[
-        merged_bonds["_merge"] == "left_only", "r0(nm)_2"
+        merged_bonds["source"] == "left_only", "r0(nm)_2"
     ] = merged_bonds.loc[
-        merged_bonds["_merge"] == "left_only", "r0(nm)_1"
+        merged_bonds["source"] == "left_only", "r0(nm)_1"
     ]
     merged_bonds.loc[
-        merged_bonds["_merge"] == "right_only", "r0(nm)_1"
+        merged_bonds["source"] == "right_only", "r0(nm)_1"
     ] = merged_bonds.loc[
-        merged_bonds["_merge"] == "right_only", "r0(nm)_2"
+        merged_bonds["source"] == "right_only", "r0(nm)_2"
     ]
 
     merged_bonds["r0(nm)"] = np.nanmean(
@@ -476,18 +476,18 @@ def _process_dihedrals(
         on=["i", "j", "k", "l", "weight", "multiplicity"],
         how="outer",
         suffixes=("_1", "_2"),
-        indicator=True,
+        indicator="source",
     )
 
     merged_dihedrals.loc[
-        merged_dihedrals["_merge"] == "left_only", "theta0_2"
+        merged_dihedrals["source"] == "left_only", "theta0_2"
     ] = merged_dihedrals.loc[
-        merged_dihedrals["_merge"] == "left_only", "theta0_1"
+        merged_dihedrals["source"] == "left_only", "theta0_1"
     ]
     merged_dihedrals.loc[
-        merged_dihedrals["_merge"] == "right_only", "theta0_1"
+        merged_dihedrals["source"] == "right_only", "theta0_1"
     ] = merged_dihedrals.loc[
-        merged_dihedrals["_merge"] == "right_only", "theta0_2"
+        merged_dihedrals["source"] == "right_only", "theta0_2"
     ]
 
     merged_dihedrals["theta0"] = _angular_midpoint(
