@@ -623,7 +623,7 @@ def _process_contacts(
         float
     )
     df_additional[["i", "j"]] = df_additional[["i", "j"]].astype(int)
-    df_additional["distance"] = (
+    df_additional["sigma"] = (
         df_additional["A"]
         / df_additional["B"]
         * COEFF_ATTRACTION
@@ -674,42 +674,42 @@ def _process_contacts(
             on=["i", "j"],
             how="outer",
             suffixes=("_1", "_2"),
-            indicator=True,
+            indicator="source",
         )  # this identifies common contacts, both called by ShadowMap
 
         # contacts only on reference
         merged_contacts.loc[
-            merged_contacts["_merge"] == "left_only", "sigma_iso"
+            merged_contacts["source"] == "left_only", "sigma_iso"
         ] = merged_contacts.loc[
-            merged_contacts["_merge"] == "left_only", "sigma_1"
+            merged_contacts["source"] == "left_only", "sigma_1"
         ]
         merged_contacts.loc[
-            merged_contacts["_merge"] == "left_only", "sigma_2"
+            merged_contacts["source"] == "left_only", "sigma_2"
         ] = merged_contacts.loc[
-            merged_contacts["_merge"] == "left_only", "sigma_1"
+            merged_contacts["source"] == "left_only", "sigma_1"
         ]
 
         # contacts only on additional
         merged_contacts.loc[
-            merged_contacts["_merge"] == "right_only", "sigma_iso"
+            merged_contacts["source"] == "right_only", "sigma_iso"
         ] = merged_contacts.loc[
-            merged_contacts["_merge"] == "right_only", "sigma_2"
+            merged_contacts["source"] == "right_only", "sigma_2"
         ]
         merged_contacts.loc[
-            merged_contacts["_merge"] == "right_only", "sigma_1"
+            merged_contacts["source"] == "right_only", "sigma_1"
         ] = merged_contacts.loc[
-            merged_contacts["_merge"] == "right_only", "sigma_2"
+            merged_contacts["source"] == "right_only", "sigma_2"
         ]
 
         # common contacts
         merged_contacts.loc[
-            merged_contacts["_merge"] == "both", "sigma_iso"
+            merged_contacts["source"] == "both", "sigma_iso"
         ] = isoenergetic_distance(
             merged_contacts.loc[
-                merged_contacts["_merge"] == "both", "sigma_1"
+                merged_contacts["source"] == "both", "sigma_1"
             ],
             merged_contacts.loc[
-                merged_contacts["_merge"] == "both", "sigma_2"
+                merged_contacts["source"] == "both", "sigma_2"
             ],
         )
 
@@ -773,9 +773,9 @@ def _process_contacts(
             contact_information["i"].append(row.i)
             contact_information["j"].append(row.j)
             contact_information["distance"].append(row.sigma_iso)
-            if row._merge == "left_only":
+            if row.source == "left_only":
                 contact_information["source"].append("left")
-            elif row._merge == "right_only":
+            elif row.source == "right_only":
                 contact_information["source"].append("right")
             else:
                 contact_information["source"].append("common")
