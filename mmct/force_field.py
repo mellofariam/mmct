@@ -194,7 +194,9 @@ def _process_angles(
     elif mode == "flat_bottom":
         angles_xml = ET.SubElement(reference_root, "angles")
         flat_bottom_xml = ET.SubElement(
-            angles_xml, "angles_type", attrib={"name": "angle_flat_bottom"}
+            angles_xml,
+            "angles_type",
+            attrib={"name": "angle_flat_bottom"},
         )
         ET.SubElement(
             flat_bottom_xml,
@@ -220,8 +222,8 @@ def _process_angles(
                     "j": str(row["aj"]),
                     "k": str(row["ak"]),
                     "Ka": f"{row["Ka"]:.5e}",
-                    "theta1": f"{theta1:.5e}",
-                    "theta2": f"{theta2:.5e}",
+                    "theta1": f"{np.radians(theta1):.5e}",
+                    "theta2": f"{np.radians(theta2):.5e}",
                 },
             )
 
