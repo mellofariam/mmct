@@ -715,8 +715,8 @@ def _process_contacts(
 
         merged_contacts["epsilon_iso"] = np.abs(
             contact_energy(
-                merged_contacts["sigma_1"],
-                merged_contacts["sigma_iso"],
+                r=merged_contacts["sigma_1"],
+                sigma=merged_contacts["sigma_iso"],
             )
         )
 
@@ -724,10 +724,46 @@ def _process_contacts(
         merged_contacts.loc[
             merged_contacts["epsilon_iso"] < 0.5 * EPSILON,
             "sigma_iso",
-        ] = merged_contacts.loc[
-            merged_contacts["epsilon_iso"] < 0.5 * EPSILON, "sigma_1"
-        ]
+        ] = np.min(
+            merged_contacts.loc[
+                merged_contacts["epsilon_iso"] < 0.5 * EPSILON,
+                ["sigma_1", "sigma_2"],
+            ].values,
+            axis=1,
+        )
 
+        # reassign source for the changed cases
+        merged_contacts.loc[
+            (
+                (merged_contacts["source"] == "both")
+                & (
+                    merged_contacts["sigma_iso"]
+                    == merged_contacts["sigma_1"]
+                )
+                & (
+                    merged_contacts["sigma_iso"]
+                    != merged_contacts["sigma_2"]
+                )
+            ),
+            "source",
+        ] = "left_only"
+
+        merged_contacts.loc[
+            (
+                (merged_contacts["source"] == "both")
+                & (
+                    merged_contacts["sigma_iso"]
+                    == merged_contacts["sigma_2"]
+                )
+                & (
+                    merged_contacts["sigma_iso"]
+                    != merged_contacts["sigma_1"]
+                )
+            ),
+            "source",
+        ] = "right_only"
+
+        # calculate the new A and B parameters
         merged_contacts["A"] = (
             EPSILON
             * COEFF_REPULSION
@@ -781,7 +817,7 @@ def _process_contacts(
                 contact_information["source"].append("common")
 
         # 3) In one go, reassign the children of dihedral_type
-        dihedral_type[:] = edited_contacts
+        contact_type[:] = edited_contacts
 
     return multibasin_xml, pandas.DataFrame(contact_information)
 
