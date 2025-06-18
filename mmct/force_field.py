@@ -194,7 +194,7 @@ def _process_angles(
     elif mode == "flat_bottom":
         angles_xml = ET.SubElement(reference_root, "angles")
         flat_bottom_xml = ET.SubElement(
-            angles_xml, "angles_type", attrib={"name": "flat_bottom"}
+            angles_xml, "angles_type", attrib={"name": "angle_flat_bottom"}
         )
         ET.SubElement(
             flat_bottom_xml,
