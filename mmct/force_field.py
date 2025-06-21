@@ -130,7 +130,7 @@ def _process_angles(
         col: [] for col in additional_top["angles"].columns
     }
 
-    reference_root = multibasin_xml.getroot()
+    multibasin_root = multibasin_xml.getroot()
 
     for _, row in additional_top["angles"].iterrows():
 
@@ -158,8 +158,68 @@ def _process_angles(
         ["th0(deg)", "Ka"]
     ].astype(float)
 
+    if "angles" in reference_top:
+        df_angles_reference = reference_top["angles"].copy()
+    else:
+        # angles information present in XML
+        angles_reference = {
+            "ai": [],
+            "aj": [],
+            "ak": [],
+            "func": [],
+            "theta1": [],
+            "theta2": [],
+            "Ka": [],
+        }
+        for angle_type in multibasin_root.findall(
+            ".//angles/angles_type"
+        ):
+            for interaction in angle_type.findall("interaction"):
+                i = int(interaction.attrib["i"])
+                j = int(interaction.attrib["j"])
+                k = int(interaction.attrib["k"])
+
+                angles_reference["ai"].append(i)
+                angles_reference["aj"].append(j)
+                angles_reference["ak"].append(k)
+                angles_reference["func"].append(1)
+                angles_reference["theta1"].append(
+                    np.degrees(float(interaction.attrib["theta1"]))
+                )
+                angles_reference["theta2"].append(
+                    np.degrees(float(interaction.attrib["theta2"]))
+                )
+                angles_reference["Ka"].append(
+                    float(interaction.attrib["Ka"])
+                )
+        df_angles_reference = pandas.DataFrame(data=angles_reference)
+        df_angles_reference[["ai", "aj", "ak", "func"]] = (
+            df_angles_reference[["ai", "aj", "ak", "func"]].astype(
+                int
+            )
+        )
+        df_angles_reference[["theta1", "theta2", "Ka"]] = (
+            df_angles_reference[["theta1", "theta2", "Ka"]].astype(
+                float
+            )
+        )
+        df_angles_reference["th0(deg)"] = np.nanmean(
+            df_angles_reference[["theta1", "theta2"]],
+            axis=1,
+        )
+        df_angles_reference["editable"] = True
+        df_angles_reference.loc[
+            df_angles_reference["theta1"]
+            != df_angles_reference["theta2"],
+            "editable",
+        ] = False
+
+        df_angles_reference.drop(
+            ["theta1", "theta2"], axis=1, inplace=True
+        )
+
     merged_angles = pandas.merge(
-        reference_top["angles"],
+        df_angles_reference,
         df_angles_additional,
         left_on=["ai", "aj", "ak", "func", "Ka"],
         right_on=["ai", "aj", "ak", "func", "Ka"],
@@ -167,6 +227,19 @@ def _process_angles(
         suffixes=("_1", "_2"),
         indicator="source",
     )
+
+    if "editable" in df_angles_reference.columns:
+        # check if any of the angles in both structures are not editable
+        if len(
+            merged_angles.loc[
+                (merged_angles["source"] == "both")
+                & (merged_angles["editable"] == False),
+            ]
+        ):
+            raise ValueError(
+                "Angles already edited before is trying to be edited again. "
+                "This is not supported. "
+            )
 
     merged_angles.loc[
         merged_angles["source"] == "left_only", "th0(deg)_2"
@@ -192,7 +265,7 @@ def _process_angles(
         return multibasin_top, multibasin_xml
 
     elif mode == "flat_bottom":
-        angles_xml = ET.SubElement(reference_root, "angles")
+        angles_xml = ET.SubElement(multibasin_root, "angles")
         flat_bottom_xml = ET.SubElement(
             angles_xml,
             "angles_type",
@@ -227,7 +300,9 @@ def _process_angles(
                 },
             )
 
-        del multibasin_top["angles"]
+        if "angles" in multibasin_top:
+            del multibasin_top["angles"]
+
         return multibasin_top, multibasin_xml
     else:
         raise ValueError(
