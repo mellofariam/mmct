@@ -671,7 +671,6 @@ def _process_contacts(
         "A": [],
         "B": [],
         "sigma_reference": [],
-        "distance_additional": [],
     }
 
     for contact_type in additional_root.findall(
@@ -713,20 +712,6 @@ def _process_contacts(
                     * 0.1  # Convert to nm
                 )
 
-                contacts_converted_to_reference[
-                    "distance_additional"
-                ].append(
-                    np.linalg.norm(
-                        additional_pdb.loc[
-                            additional_pdb.idx == ii, ["x", "y", "z"]
-                        ].values[0]
-                        - additional_pdb.loc[
-                            additional_pdb.idx == jj, ["x", "y", "z"]
-                        ].values[0]
-                    )
-                    * 0.1  # Convert to nm
-                )
-
     df_additional = pandas.DataFrame(
         data=contacts_converted_to_reference
     )
@@ -741,26 +726,7 @@ def _process_contacts(
         / COEFF_REPULSION
     ) ** (1 / (POW_REPULSION - POW_ATTRACTION))
 
-    if (
-        np.mean(
-            np.isclose(
-                df_additional["sigma_additional"],
-                df_additional["distance_additional"],
-                atol=0.01,
-            )
-        )
-        != 1.0
-    ):
-        raise ValueError(
-            "The additional PDB does not match the contact distances in the XML."
-        )
-    else:
-        df_additional["sigma_additional"] = df_additional[
-            "distance_additional"
-        ].values
-        df_additional.drop(
-            ["distance_additional", "A", "B"], axis=1, inplace=True
-        )
+    df_additional.drop(["A", "B"], axis=1, inplace=True)
 
     contacts_in_reference = {
         "i": [],
@@ -768,7 +734,6 @@ def _process_contacts(
         "A": [],
         "B": [],
         "sigma_additional": [],
-        "distance_reference": [],
     }
 
     idx_from_reference_to_additional = {
@@ -788,22 +753,6 @@ def _process_contacts(
             contacts_in_reference["A"].append(interaction.attrib["A"])
             contacts_in_reference["B"].append(interaction.attrib["B"])
 
-            distance_reference = (
-                np.linalg.norm(
-                    reference_pdb.loc[
-                        reference_pdb.idx == i, ["x", "y", "z"]
-                    ].values[0]
-                    - reference_pdb.loc[
-                        reference_pdb.idx == j, ["x", "y", "z"]
-                    ].values[0]
-                )
-                * 0.1  # Convert to nm
-            )
-
-            contacts_in_reference["distance_reference"].append(
-                distance_reference
-            )
-
             ii = idx_from_reference_to_additional.get(i)
             jj = idx_from_reference_to_additional.get(j)
 
@@ -820,10 +769,9 @@ def _process_contacts(
                     * 0.1  # Convert to nm
                 )
 
-            # pair is not in the additional PDB, use reference distance
             else:
                 contacts_in_reference["sigma_additional"].append(
-                    distance_reference
+                    np.nan
                 )
 
     df_reference = pandas.DataFrame(data=contacts_in_reference)
@@ -836,32 +784,18 @@ def _process_contacts(
         / COEFF_REPULSION
     ) ** (1 / (POW_REPULSION - POW_ATTRACTION))
 
+    # pair is not in the additional PDB, use reference distance
+    df_reference["sigma_additional"] = df_reference[
+        "sigma_additional"
+    ].fillna(df_reference["sigma_reference"])
+
     df_reference["epsilon"] = (
         df_reference["A"]
         / COEFF_REPULSION
         * df_reference["sigma_reference"] ** -POW_REPULSION
     )
 
-    if (
-        np.mean(
-            np.isclose(
-                df_reference["sigma_reference"],
-                df_reference["distance_reference"],
-                atol=0.01,
-            )
-        )
-        != 1.0
-    ):
-        raise ValueError(
-            "The reference PDB does not match the contact distances in the XML."
-        )
-    else:
-        df_reference["sigma_reference"] = df_reference[
-            "distance_reference"
-        ].values
-        df_reference.drop(
-            ["distance_reference", "A", "B"], axis=1, inplace=True
-        )
+    df_reference.drop(["A", "B"], axis=1, inplace=True)
 
     if not np.isclose(
         np.nanmean(df_reference["epsilon"]), EPSILON, atol=0.01
@@ -971,18 +905,42 @@ def _process_contacts(
         )
     )
 
-    # for the cases where the eps_iso/eps <= 0.5, go back to the lower distance
+    ## for the cases where the eps_iso/eps <= 0.5
+    # when both contacts are called by Shadow, go back to the lower distance
     merged_contacts.loc[
-        merged_contacts["epsilon_iso"] <= 0.5 * EPSILON,
+        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        & (merged_contacts["source"] == "both"),
         "sigma_iso",
     ] = np.min(
         merged_contacts.loc[
-            merged_contacts["epsilon_iso"] <= 0.5 * EPSILON,
+            (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+            & (merged_contacts["source"] == "both"),
             ["sigma_reference", "sigma_additional"],
         ].values,
         axis=1,
     )
+    # when only one of the contacts is called by Shadow
+    # go back to that one
+    merged_contacts.loc[
+        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        & (merged_contacts["source"] == "left_only"),
+        "sigma_iso",
+    ] = merged_contacts.loc[
+        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        & (merged_contacts["source"] == "left_only"),
+        "sigma_reference",
+    ].values
+    merged_contacts.loc[
+        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        & (merged_contacts["source"] == "right_only"),
+        "sigma_iso",
+    ] = merged_contacts.loc[
+        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        & (merged_contacts["source"] == "right_only"),
+        "sigma_additional",
+    ].values
 
+    # fix source assignment
     merged_contacts.loc[
         (
             (
@@ -1005,8 +963,10 @@ def _process_contacts(
 
     merged_contacts.loc[
         (
-            (merged_contacts["sigma_iso"]
-            != merged_contacts["sigma_reference"])
+            (
+                merged_contacts["sigma_iso"]
+                != merged_contacts["sigma_reference"]
+            )
             & (
                 merged_contacts["sigma_iso"]
                 == merged_contacts["sigma_additional"]
