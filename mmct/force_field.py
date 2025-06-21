@@ -329,7 +329,7 @@ def _process_bonds(
         col: [] for col in additional_top["bonds"].columns
     }
 
-    reference_root = multibasin_xml.getroot()
+    multibasin_root = multibasin_xml.getroot()
 
     for _, row in additional_top["bonds"].iterrows():
 
