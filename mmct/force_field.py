@@ -1082,26 +1082,36 @@ def delete_contacts(
     Returns:
         ET.ElementTree: The modified XML tree with specified contacts removed.
     """
-    root = xml.getroot()
+    edited_xml = copy.deepcopy(xml)
+    root = edited_xml.getroot()
 
-    for contact_type in root.findall(".//contacts/contacts_type"):
+    set_contacts_to_delete = set(
+        tuple(sorted(pair)) for pair in atom_pairs
+    )
+
+    for contact_type in list(
+        root.findall(".//contacts/contacts_type")
+    ):
         elements_to_keep = []
         for element in contact_type:
             if element.tag != "interaction":
                 elements_to_keep.append(element)
-            else:
+            elif element.tag == "interaction":
+
                 i = int(element.attrib["i"])
                 j = int(element.attrib["j"])
 
-                if (i, j) not in atom_pairs and (
-                    j,
-                    i,
-                ) not in atom_pairs:
+                if (
+                    tuple(sorted([i, j]))
+                    not in set_contacts_to_delete
+                ):
                     elements_to_keep.append(element)
+            else:
+                elements_to_keep.append(element)
 
         contact_type[:] = elements_to_keep
 
-    return xml
+    return edited_xml
 
 
 def define_multibasin_model(
