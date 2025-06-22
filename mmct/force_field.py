@@ -1050,14 +1050,26 @@ def scale_contacts(
     Returns:
         ET.ElementTree: The modified XML tree with scaled contacts.
     """
-    root = xml.getroot()
+
+    edited_xml = copy.deepcopy(xml)
+
+    root = edited_xml.getroot()
+
+    if scale_by == 0:
+        raise ValueError(
+            "Scale factor must be greater than zero. Use `delete_contacts` instead to remove contacts."
+        )
+
+    contacts_to_scale = set(
+        tuple(sorted(pair)) for pair in atom_pairs
+    )
 
     for contact_type in root.findall(".//contacts/contacts_type"):
         for interaction in contact_type.findall("interaction"):
             i = int(interaction.attrib["i"])
             j = int(interaction.attrib["j"])
 
-            if (i, j) in atom_pairs or (j, i) in atom_pairs:
+            if tuple(sorted([i, j])) in contacts_to_scale:
                 interaction.attrib["A"] = (
                     f"{scale_by * float(interaction.attrib['A']):.5e}"
                 )
@@ -1065,7 +1077,7 @@ def scale_contacts(
                     f"{scale_by * float(interaction.attrib['B']):.5e}"
                 )
 
-    return xml
+    return edited_xml
 
 
 def delete_contacts(
