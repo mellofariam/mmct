@@ -688,8 +688,8 @@ def _process_contacts(
             # when going thru additional, there's no optional of
             # sigma_reference not existing if sigma_additional exists
             if i is not None and j is not None:
-                contacts_converted_to_reference["i"].append(i)
-                contacts_converted_to_reference["j"].append(j)
+                contacts_converted_to_reference["i"].append(min(i, j))
+                contacts_converted_to_reference["j"].append(max(i, j))
 
                 contacts_converted_to_reference["A"].append(
                     interaction.attrib["A"]
@@ -748,8 +748,8 @@ def _process_contacts(
             i = int(interaction.attrib["i"])
             j = int(interaction.attrib["j"])
 
-            contacts_in_reference["i"].append(i)
-            contacts_in_reference["j"].append(j)
+            contacts_in_reference["i"].append(min(i, j))
+            contacts_in_reference["j"].append(max(i, j))
             contacts_in_reference["A"].append(interaction.attrib["A"])
             contacts_in_reference["B"].append(interaction.attrib["B"])
 
