@@ -112,6 +112,39 @@ def save_xml(
     xml_tree.write(xmlfile)
 
 
+def _remove_xml_section(tree: ET.ElementTree, path: str):
+    """
+    Remove *every* element matching `path` (and all its children)
+    from the XML tree—without using O(N^2) remove() calls.
+    """
+    root = tree.getroot()
+
+    # 1. Find all elements to remove
+    to_remove_list = root.findall(path)
+    to_remove_set = set(to_remove_list)
+
+    # 2. Build a parent map (child → parent) for the whole tree
+    parent_map = {c: p for p in tree.iter() for c in p}
+
+    # 3. Group removals by their parent
+    parents = {}
+    for elem in to_remove_list:
+        parent = parent_map.get(elem)
+        if parent is not None:
+            parents.setdefault(parent, []).append(elem)
+
+    # 4. For each affected parent, rebuild its children list in one go
+    for parent in parents:
+        # Keep only those children not slated for removal
+        kept_children = [
+            child for child in parent if child not in to_remove_set
+        ]
+        parent.clear()  # drop all old children in one C-call
+        parent.extend(kept_children)  # add back only the survivors
+
+    return tree
+
+
 def _process_angles(
     reference_top: dict[str, pandas.DataFrame],
     additional_top: dict[str, pandas.DataFrame],
@@ -265,6 +298,12 @@ def _process_angles(
         return multibasin_top, multibasin_xml
 
     elif mode == "flat_bottom":
+
+        # remove angles from multibasin_xml if they exist
+        multibasin_xml = _remove_xml_section(
+            multibasin_xml, ".//angles"
+        )
+
         angles_xml = ET.SubElement(multibasin_root, "angles")
         flat_bottom_xml = ET.SubElement(
             angles_xml,
