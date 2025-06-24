@@ -91,7 +91,7 @@ def save_top(
 
     with open(topfile, "w") as f:
         for section, df in top.items():
-            f.write(f"[{section}]\n")
+            f.write(f"[ {section} ]\n")
             f.write("; " + "\t".join(df.columns) + "\n")
             for row in df.itertuples(index=False):
                 f.write(
