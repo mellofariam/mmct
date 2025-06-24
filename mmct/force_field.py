@@ -1236,7 +1236,9 @@ def load_force_field(
     dict[str, pandas.DataFrame],
     ET.ElementTree,
 ]:
-    pdb = pdb_tools.read_pdb(pdb_file)
+    pdb = pdb_tools.read_pdb(
+        pdb_file, coarse_grain=True, ignore_HETATM=True
+    )
     top = read_top(top_file)
     xml = ET.parse(xml_file)
 
