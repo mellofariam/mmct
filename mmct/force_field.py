@@ -120,6 +120,8 @@ def _remove_xml_section(tree: ET.ElementTree, path: str):
     from the XML tree—without using O(N^2) remove() calls.
     """
     root = tree.getroot()
+    if root is None:
+        raise ValueError("The XML tree is empty or malformed.")
 
     # 1. Find all elements to remove
     to_remove_list = root.findall(path)
@@ -166,6 +168,8 @@ def _process_angles(
     }
 
     multibasin_root = multibasin_xml.getroot()
+    if multibasin_root is None:
+        raise ValueError("The XML tree is empty or malformed.")
 
     for _, row in additional_top["angles"].iterrows():
 
@@ -268,7 +272,7 @@ def _process_angles(
         if len(
             merged_angles.loc[
                 (merged_angles["source"] == "both")
-                & (merged_angles["editable"] == False),
+                & (merged_angles["editable"] == False)
             ]
         ):
             raise ValueError(
@@ -316,7 +320,7 @@ def _process_angles(
             flat_bottom_xml,
             "expression",
             attrib={
-                "expr": "Ka * ((theta1 - theta)^2 * step(theta1 - theta) + (theta - theta2)^2 * step(theta-theta2))"
+                "expr": "Ka / 2 * ((theta1 - theta)^2 * step(theta1 - theta) + (theta - theta2)^2 * step(theta-theta2))"
             },
         )
         ET.SubElement(flat_bottom_xml, "parameter").text = "Ka"
@@ -467,8 +471,20 @@ def _process_dihedrals(
     """
 
     reference_root = reference_xml.getroot()
+    if reference_root is None:
+        raise ValueError(
+            "The reference XML tree is empty or malformed."
+        )
     additional_root = additional_xml.getroot()
+    if additional_root is None:
+        raise ValueError(
+            "The additional XML tree is empty or malformed."
+        )
     multibasin_root = multibasin_xml.getroot()
+    if multibasin_root is None:
+        raise ValueError(
+            "The multibasin XML tree is empty or malformed."
+        )
 
     dihedrals_converted_to_reference = {
         "i": [],
@@ -566,25 +582,9 @@ def _process_dihedrals(
     df_reference[["theta0", "weight"]] = df_reference[
         ["theta0", "weight"]
     ].astype(float)
-    df_reference[
-        [
-            "i",
-            "j",
-            "k",
-            "l",
-            "multiplicity",
-        ]
-    ] = df_reference[
-        [
-            "i",
-            "j",
-            "k",
-            "l",
-            "multiplicity",
-        ]
-    ].astype(
-        int
-    )
+    df_reference[["i", "j", "k", "l", "multiplicity"]] = df_reference[
+        ["i", "j", "k", "l", "multiplicity"]
+    ].astype(int)
 
     # Merge the two DataFrames on i, j, k, l
 
@@ -609,8 +609,8 @@ def _process_dihedrals(
     ]
 
     merged_dihedrals["theta0"] = _angular_midpoint(
-        merged_dihedrals["theta0_1"].values,
-        merged_dihedrals["theta0_2"].values,
+        merged_dihedrals["theta0_1"].to_numpy(),
+        merged_dihedrals["theta0_2"].to_numpy(),
     )
 
     ## replace new dihedrals in the mutlibasin_xml
@@ -703,8 +703,20 @@ def _process_contacts(
         ) ** (1 / (POW_REPULSION - POW_ATTRACTION))
 
     reference_root = reference_xml.getroot()
+    if reference_root is None:
+        raise ValueError(
+            "The reference XML tree is empty or malformed."
+        )
     additional_root = additional_xml.getroot()
+    if additional_root is None:
+        raise ValueError(
+            "The additional XML tree is empty or malformed."
+        )
     multibasin_root = multibasin_xml.getroot()
+    if multibasin_root is None:
+        raise ValueError(
+            "The multibasin XML tree is empty or malformed."
+        )
 
     contacts_converted_to_reference = {
         "i": [],
@@ -1131,6 +1143,8 @@ def scale_contacts(
     edited_xml = copy.deepcopy(xml)
 
     root = edited_xml.getroot()
+    if root is None:
+        raise ValueError("The XML tree is empty or malformed.")
 
     if scale_by == 0:
         raise ValueError(
@@ -1159,8 +1173,9 @@ def scale_contacts(
 
 def delete_contacts(
     xml: ET.ElementTree,
+    top: dict[str, pandas.DataFrame],
     atom_pairs: np.ndarray,
-) -> ET.ElementTree:
+) -> tuple[ET.ElementTree, dict[str, pandas.DataFrame]]:
     """
     Deletes contacts in the XML file for specified atom pairs.
 
@@ -1172,7 +1187,11 @@ def delete_contacts(
         ET.ElementTree: The modified XML tree with specified contacts removed.
     """
     edited_xml = copy.deepcopy(xml)
+    edited_top = copy.deepcopy(top)
+
     root = edited_xml.getroot()
+    if root is None:
+        raise ValueError("The XML tree is empty or malformed.")
 
     set_contacts_to_delete = set(
         tuple(sorted(pair)) for pair in atom_pairs
@@ -1244,10 +1263,7 @@ def define_multibasin_model(
     Updates the dihedrals and angles from the reference topology to the middle value between the two topologies.
     """
 
-    multibasin_top = reference_top.copy()
-
-    reference_xml = ET.parse(reference_xml)
-    additional_xml = ET.parse(additional_xml)
+    multibasin_top = copy.deepcopy(reference_top)
     multibasin_xml = copy.deepcopy(reference_xml)
 
     # For the angles
