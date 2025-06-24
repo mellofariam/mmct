@@ -1,5 +1,5 @@
 import copy
-import xml.etree.cElementTree as ET
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pandas
@@ -1234,7 +1234,7 @@ def load_force_field(
 ) -> tuple[
     pandas.DataFrame,
     dict[str, pandas.DataFrame],
-    ET.ElementTree[ET.Element[str]],
+    ET.ElementTree,
 ]:
     pdb = pdb_tools.read_pdb(pdb_file)
     top = read_top(top_file)
