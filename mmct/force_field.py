@@ -4,6 +4,8 @@ import xml.etree.cElementTree as ET
 import numpy as np
 import pandas
 
+from . import pdb_tools
+
 
 def read_top(topfile: str) -> dict[str, pandas.DataFrame]:
     """
@@ -1073,6 +1075,42 @@ def _process_contacts(
     return multibasin_xml, pandas.DataFrame(contact_information)
 
 
+def _update_exclusions(
+    xml: ET.ElementTree,
+    top: dict[str, pandas.DataFrame],
+) -> dict[str, pandas.DataFrame]:
+    """
+    Updates the exclusions in the topology based on the contacts defined in the XML.
+
+    Args:
+        xml (ET.ElementTree): The XML tree containing contact information.
+        top (dict[str, pandas.DataFrame]): The topology dictionary containing atom information.
+
+    Returns:
+        dict[str, pandas.DataFrame]: The updated topology with updated exclusions.
+    """
+    root = xml.getroot()
+    if root is None:
+        raise ValueError("The XML tree is empty or malformed.")
+
+    exclusions = {
+        "ai": [],
+        "aj": [],
+    }
+
+    for contact_type in root.findall(".//contacts/contacts_type"):
+        for interaction in contact_type.findall("interaction"):
+            i = int(interaction.attrib["i"])
+            j = int(interaction.attrib["j"])
+
+            exclusions["ai"].append(i)
+            exclusions["aj"].append(j)
+
+    top["exclusions"] = pandas.DataFrame(exclusions)
+
+    return top
+
+
 def scale_contacts(
     xml: ET.ElementTree,
     atom_pairs: np.ndarray,
@@ -1162,15 +1200,36 @@ def delete_contacts(
 
         contact_type[:] = elements_to_keep
 
-    return edited_xml
+    edited_top = _update_exclusions(
+        xml=edited_xml,
+        top=edited_top,
+    )
+
+    return edited_xml, edited_top
+
+
+def load_force_field(
+    pdb_file: str = "smog.pdb",
+    top_file: str = "smog.top",
+    xml_file: str = "smog.xml",
+) -> tuple[
+    pandas.DataFrame,
+    dict[str, pandas.DataFrame],
+    ET.ElementTree[ET.Element[str]],
+]:
+    pdb = pdb_tools.read_pdb(pdb_file)
+    top = read_top(top_file)
+    xml = ET.parse(xml_file)
+
+    return pdb, top, xml
 
 
 def define_multibasin_model(
     reference_top: dict[str, pandas.DataFrame],
-    reference_xml: str,
+    reference_xml: ET.ElementTree,
     reference_pdb: pandas.DataFrame,
     additional_top: dict[str, pandas.DataFrame],
-    additional_xml: str,
+    additional_xml: ET.ElementTree,
     additional_pdb: pandas.DataFrame,
     idx_from_additional_to_reference: dict[int, int],
     mode_angles: str = "middle",
@@ -1231,6 +1290,11 @@ def define_multibasin_model(
         multibasin_xml,
         idx_from_additional_to_reference,
         mode_contacts,
+    )
+
+    multibasin_top = _update_exclusions(
+        xml=multibasin_xml,
+        top=multibasin_top,
     )
 
     save_top(multibasin_top, top_file)
