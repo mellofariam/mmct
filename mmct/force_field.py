@@ -1303,3 +1303,32 @@ def define_multibasin_model(
     df_contacts.to_pickle(contact_file)
 
     return multibasin_top, multibasin_xml, df_contacts
+
+
+def xml2contacts(
+    xml: ET.ElementTree,
+    filename: str = "smog.CG.contacts.CG",
+) -> None:
+    """
+    Extract contacts from XML and write contact file.
+
+    Args:
+        xml (ET.ElementTree): The XML tree containing contact information.
+        filename (str): The name of the output file to save contacts.
+    """
+
+    root = xml.getroot()
+    if root is None:
+        raise ValueError("The XML tree is empty or malformed.")
+
+    lines = []
+
+    for contact_type in root.findall(".//contacts/contacts_type"):
+        for interaction in contact_type.findall("interaction"):
+            i = int(interaction.attrib["i"])
+            j = int(interaction.attrib["j"])
+
+            lines.append(f"1 {i} 1 {j}\n")
+
+    with open(filename, "w") as f:
+        f.writelines(lines)
