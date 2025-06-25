@@ -287,3 +287,51 @@ def is_intrachain_contact(
         df.loc[df["idx"] == i, "chain_id"].values[0]
         == df.loc[df["idx"] == j, "chain_id"].values[0]
     )
+
+
+def residue_type(df: pandas.DataFrame, i: int) -> str:
+    """
+    Determine the type of residue (protein or nucleic) based on the residue name at index `i`.
+    Args:
+        df (pandas.DataFrame): DataFrame containing PDB data.
+        i (int): Index of the atom to check.
+    Returns:
+        str: A string representing the type of residue, either "protein" or "nucleic".
+    """
+    residue_name = df.loc[df["idx"] == i, "residue"].values[0]
+
+    # fmt: off
+    nucleic_residues = [
+        "A", "C", "G", "U", 
+        "AM", "CM", "GM", "UM", 
+        "A0P", "C0P", "G0P", "U0P",
+        "A0PM", "C0PM", "G0PM", "U0PM",
+    ]
+
+    # fmt: on
+    if residue_name in nucleic_residues:
+        return "nucleic"
+    else:
+        return "protein"
+
+
+def contact_type(
+    df: pandas.DataFrame,
+    i: int,
+    j: int,
+) -> str:
+    """
+    Determine the type of contact between two atoms based on their residue types.
+    Args:
+        df (pandas.DataFrame): DataFrame containing PDB data.
+        i (int): Index of the first atom.
+        j (int): Index of the second atom.
+    Returns:
+        str: A string representing the type of contact, either "protein-protein",
+            "nucleic-nucleic", or "nucleic-protein".
+    """
+
+    residues = [residue_type(df, i), residue_type(df, j)]
+    residues.sort()
+
+    return "-".join(residues)
