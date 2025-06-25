@@ -8,9 +8,14 @@ PDB_FORMATS = {
 }
 
 
-def _to_coarse_grain(atom_name, residue):
+def _to_coarse_grain(atom_name: str, residue: str) -> bool:
     """
-    Check if the atom is to selected to coarse-graining based on its name and residue.
+    Check if the atom is to be selected to coarse-graining based on its name and residue.
+    Args:
+        atom_name (str): Name of the atom.
+        residue (str): Name of the residue.
+    Returns:
+        bool: True if the atom is to be selected for coarse-graining, False otherwise.
     """
     return (
         atom_name == "CA"
@@ -41,6 +46,31 @@ def read_pdb(
     coarse_grain: bool = False,
     ignore_HETATM: bool = False,
 ) -> pandas.DataFrame:
+    """
+    Read a PDB file and return a DataFrame with the atomic coordinates and related information.
+
+    Args:
+        pdb_path (str): Path to the PDB file to be read.
+        coarse_grain (bool, optional): If True, get information only for the CA for each protein
+            residue and for the P (or O5* if the base lacks P) atom for each RNA base.  Defaults to False.
+        ignore_HETATM (bool, optional): If True, ignore HETATM records and only include ATOM records.
+            Defaults to False.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the same columns as a PDB file.
+            - idx: Sequential index of the atom.
+            - record: Record type ("ATOM" or "HETATM").
+            - atom: Atom name.
+            - residue: Residue name.
+            - residue_number: Residue sequence number.
+            - chain_id: Chain identifier.
+            - x: X coordinate.
+            - y: Y coordinate.
+            - z: Z coordinate.
+            - occupancy: Occupancy value.
+            - b_factor: B-factor (temperature factor).
+            - element: Element symbol.
+    """
 
     data = {
         "idx": [],
@@ -101,14 +131,17 @@ def read_pdb(
     return df
 
 
-def write_seqres(chains, complex: Complex, output_file):
+def write_seqres(
+    chains: list[str], complex: Complex, output_file: str
+) -> None:
     """
-    Write an RNA sequence in the SEQRES format for a PDB file.
+    Write the residue sequence in the SEQRES format for a PDB file.
 
-    Parameters:
-    chains (list): List of chains.
-    complex (mol.Complex): Complex object.
-    output_file (str): Path to the output PDB file.
+    Args:
+        chains (list[str]): List of chain IDs for which to write the SEQRES records.
+        complex (Complex): Complex object containing the molecular data.
+        output_file (str): Path to the output file where the SEQRES records
+            will be written.
     """
     with open(output_file, "w") as f:
         seqres_lines = []
@@ -128,13 +161,28 @@ def write_seqres(chains, complex: Complex, output_file):
 
 
 def save_pdb(
-    df,
-    filename=None,
-    ignore_HETATM=False,
-    file_mode="w",
-    add_TER=True,
-    add_END=True,
-):
+    df: pandas.DataFrame,
+    filename: str,
+    ignore_HETATM: bool = False,
+    file_mode: str = "w",
+    add_TER: bool = True,
+    add_END: bool = True,
+) -> None:
+    """
+    Save the PDB data from a DataFrame to a PDB file.
+
+    Args:
+        df (pandas.DataFrame): DataFrame containing PDB data
+        filename (str): Path to the output PDB file.
+        ignore_HETATM (bool, optional): If True, ignore HETATM records and
+            only include ATOM records. Defaults to False.
+        file_mode (str, optional): File mode for writing the PDB file.
+            Defaults to "w".
+        add_TER (bool, optional): If True, add TER records at the end of each
+            chain. Defaults to True.
+        add_END (bool, optional): If True, add an END record at the end of
+            the PDB file. Defaults to True.
+    """
 
     with open(filename, file_mode) as pdb_file:
         index = 1
@@ -205,11 +253,36 @@ def save_pdb(
             pdb_file.write(PDB_FORMATS["end"])
 
 
-def isin(df, i, chain_ids):
+def isin(df: pandas.DataFrame, i: int, chain_ids: list) -> bool:
+    """
+    Check if the chain ID of the atom at index `i` is in the provided list of chain IDs.
+
+    Args:
+        df (pandas.DataFrame): DataFrame containing PDB data.
+        i (int): Index of the atom to check.
+        chain_ids (list): List of chain IDs to check against.
+    Returns:
+        bool: True if the chain ID of the atom at index `i` is in `chain_ids`, False otherwise.
+    """
+
+    if not isinstance(chain_ids, list):
+        chain_ids = [chain_ids]
     return df.loc[df["idx"] == i, "chain_id"].values[0] in chain_ids
 
 
-def is_intrachain_contact(df, i, j):
+def is_intrachain_contact(
+    df: pandas.DataFrame, i: int, j: int
+) -> bool:
+    """
+    Check if the atoms at indices `i` and `j` belong to the same chain.
+
+    Args:
+        df (pandas.DataFrame): DataFrame containing PDB data.
+        i (int): Index of the first atom.
+        j (int): Index of the second atom.
+    Returns:
+        bool: True if both atoms belong to the same chain, False otherwise.
+    """
     return (
         df.loc[df["idx"] == i, "chain_id"].values[0]
         == df.loc[df["idx"] == j, "chain_id"].values[0]
