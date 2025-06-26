@@ -144,7 +144,6 @@ def write_seqres(
             will be written.
     """
     with open(output_file, "w") as f:
-        seqres_lines = []
         for chain_id in chains:
             sequence = complex.molecules[
                 chain_id
@@ -155,9 +154,7 @@ def write_seqres(
                     f"SEQRES {i//13 + 1:>3} {chain_id}  {len(sequence):>3}    "
                     + "   ".join(segment)
                 )
-                seqres_lines.append(seqres_line)
-
-        f.writelines("\n".join(seqres_lines))
+                f.write(seqres_line + "\n")
 
 
 def save_pdb(
@@ -185,9 +182,29 @@ def save_pdb(
     """
 
     with open(filename, file_mode) as pdb_file:
+
         index = 1
         previous_chain_id = None
+        row = None
+
         for _, row in df.iterrows():
+            # Add TER records for the last residue in each chain if required
+            if (
+                add_TER
+                and previous_chain_id != row.chain_id
+                and previous_chain_id is not None
+            ):
+                # Only add TER if the chain has changed
+                pdb_file.write(
+                    PDB_FORMATS["ter"].format(
+                        index=index,
+                        residue=row.residue,
+                        chain_id=row.chain_id,
+                        residue_number=int(row.residue_number),
+                    )
+                )
+                index += 1
+
             if row.record == "ATOM":
                 pdb_file.write(
                     PDB_FORMATS["coordinates"].format(
@@ -200,9 +217,9 @@ def save_pdb(
                         x=float(row.x),
                         y=float(row.y),
                         z=float(row.z),
-                        occupancy=float(1),
-                        b_factor=float(0),
-                        element=str(row.atom)[0],
+                        occupancy=float(row.occupancy),
+                        b_factor=float(row.b_factor),
+                        element=row.element,
                     )
                 )
                 index += 1
@@ -225,30 +242,17 @@ def save_pdb(
                 )
                 index += 1
 
-            # Add TER records for the last residue in each chain if required
-            if (
-                add_TER
-                and previous_chain_id != row.chain_id
-                and previous_chain_id is not None
-            ):
-                # Only add TER if the chain has changed
-                pdb_file.write(
-                    PDB_FORMATS["ter"].format(
-                        index=index,
-                        residue=row.residue,
-                        chain_id=row.chain_id,
-                        residue_number=int(row.residue_number),
-                    )
+            previous_chain_id = row.chain_id
+
+        if add_TER and row is not None:
+            pdb_file.write(
+                PDB_FORMATS["ter"].format(
+                    index=index,
+                    residue=row.residue,
+                    chain_id=row.chain_id,
+                    residue_number=int(row.residue_number),
                 )
-                index += 1
-        pdb_file.write(
-            PDB_FORMATS["ter"].format(
-                index=index,
-                residue=row.residue,
-                chain_id=row.chain_id,
-                residue_number=int(row.residue_number),
             )
-        )
         if add_END:
             pdb_file.write(PDB_FORMATS["end"])
 
