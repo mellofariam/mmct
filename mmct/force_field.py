@@ -339,7 +339,7 @@ def _process_angles(
                     "i": str(row["ai"]),
                     "j": str(row["aj"]),
                     "k": str(row["ak"]),
-                    "Ka": f"{row["Ka"]:.5e}",
+                    "Ka": f"{row['Ka']:.5e}",
                     "theta1": f"{np.radians(theta1):.5e}",
                     "theta2": f"{np.radians(theta2):.5e}",
                 },
