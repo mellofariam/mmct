@@ -723,7 +723,7 @@ def _process_contacts(
         "j": [],
         "A": [],
         "B": [],
-        "sigma_reference": [],
+        # "sigma_reference": [],
     }
 
     for contact_type in additional_root.findall(
@@ -750,20 +750,19 @@ def _process_contacts(
                 contacts_converted_to_reference["B"].append(
                     interaction.attrib["B"]
                 )
-
-                contacts_converted_to_reference[
-                    "sigma_reference"
-                ].append(
-                    np.linalg.norm(
-                        reference_pdb.loc[
-                            reference_pdb.idx == i, ["x", "y", "z"]
-                        ].values[0]
-                        - reference_pdb.loc[
-                            reference_pdb.idx == j, ["x", "y", "z"]
-                        ].values[0]
-                    )
-                    * 0.1  # Convert to nm
-                )
+    
+    i_list = contacts_converted_to_reference["i"]
+    j_list = contacts_converted_to_reference["j"]
+    contacts_converted_to_reference["sigma_reference"] =\
+        np.linalg.norm(
+            reference_pdb.loc[
+                i_list, ["x", "y", "z"]
+            ].values
+            - reference_pdb.loc[
+                j_list, ["x", "y", "z"]
+            ].values,
+            axis = 1
+        )* 0.1  # Convert to nm
 
     df_additional = pandas.DataFrame(
         data=contacts_converted_to_reference
@@ -786,7 +785,7 @@ def _process_contacts(
         "j": [],
         "A": [],
         "B": [],
-        "sigma_additional": [],
+        # "sigma_additional": [],
     }
 
     idx_from_reference_to_additional = {
@@ -808,24 +807,32 @@ def _process_contacts(
 
             ii = idx_from_reference_to_additional.get(i)
             jj = idx_from_reference_to_additional.get(j)
+    
+    new_row = pandas.DataFrame([{}], index=[np.nan])
+    additional_pdb_tmp = pandas.concat([additional_pdb, new_row])
 
-            if ii is not None and jj is not None:
-                contacts_in_reference["sigma_additional"].append(
-                    np.linalg.norm(
-                        additional_pdb.loc[
-                            additional_pdb.idx == ii, ["x", "y", "z"]
-                        ].values[0]
-                        - additional_pdb.loc[
-                            additional_pdb.idx == jj, ["x", "y", "z"]
-                        ].values[0]
-                    )
-                    * 0.1  # Convert to nm
-                )
-
-            else:
-                contacts_in_reference["sigma_additional"].append(
-                    np.nan
-                )
+    ii_list = np.array([
+        idx_from_reference_to_additional.get(i)
+        for i in contacts_in_reference["i"]
+        ],
+        dtype=float
+    )
+    jj_list = np.array([
+        idx_from_reference_to_additional.get(j)
+        for j in contacts_in_reference["j"]
+        ],
+        dtype=float
+    )
+    contacts_in_reference["sigma_additional"] =\
+        np.linalg.norm(
+            additional_pdb_tmp.loc[
+                ii_list, ["x", "y", "z"]
+            ].values
+            - additional_pdb_tmp.loc[
+                jj_list, ["x", "y", "z"]
+            ].values,
+            axis = 1
+        )* 0.1  # Convert to nm
 
     df_reference = pandas.DataFrame(data=contacts_in_reference)
     df_reference[["A", "B"]] = df_reference[["A", "B"]].astype(float)

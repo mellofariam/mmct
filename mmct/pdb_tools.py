@@ -127,6 +127,7 @@ def read_pdb(
                     idx += 1
 
     df = pandas.DataFrame(data)
+    df.index = df["idx"].values
 
     return df
 
