@@ -1317,8 +1317,6 @@ def load_force_field(
         pdb_file,
         coarse_grain=coarse_grain,
         ignore_HETATM=ignore_HETATM,
-    pdb = pdb_tools.read_pdb(
-        pdb_file, coarse_grain=True, ignore_HETATM=True
     )
     top = read_top(top_file)
     xml = ET.parse(xml_file)
