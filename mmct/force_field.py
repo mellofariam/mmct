@@ -434,10 +434,11 @@ def _process_bonds(
             bonds_converted_to_reference["ai"].append(i)
             bonds_converted_to_reference["aj"].append(j)
             bonds_converted_to_reference["func"].append(row["func"])
-            bonds_converted_to_reference["r0(nm)"].append(
-                row["r0(nm)"]
-            )
-            bonds_converted_to_reference["Kb"].append(row["Kb"])
+            if "r0(nm)" in row and "Kb" in row:
+                bonds_converted_to_reference["r0(nm)"].append(
+                    row["r0(nm)"]
+                )
+                bonds_converted_to_reference["Kb"].append(row["Kb"])
 
     df_bonds_additional = pandas.DataFrame(
         data=bonds_converted_to_reference
@@ -445,39 +446,57 @@ def _process_bonds(
     df_bonds_additional[["ai", "aj", "func"]] = df_bonds_additional[
         ["ai", "aj", "func"]
     ].astype(int)
-    df_bonds_additional[["r0(nm)", "Kb"]] = df_bonds_additional[
-        ["r0(nm)", "Kb"]
-    ].astype(float)
+    if ("r0(nm)" in df_bonds_additional.columns) and (
+        "Kb" in df_bonds_additional.columns
+    ):
+        df_bonds_additional[["r0(nm)", "Kb"]] = df_bonds_additional[
+            ["r0(nm)", "Kb"]
+        ].astype(float)
 
     merged_bonds = pandas.merge(
         reference_top["bonds"],
         df_bonds_additional,
-        left_on=["ai", "aj", "func", "Kb"],
-        right_on=["ai", "aj", "func", "Kb"],
+        left_on=["ai", "aj", "func"],
+        right_on=["ai", "aj", "func"],
         how="outer",
         suffixes=("_1", "_2"),
         indicator="source",
     )
 
-    merged_bonds.loc[
-        merged_bonds["source"] == "left_only", "r0(nm)_2"
-    ] = merged_bonds.loc[
-        merged_bonds["source"] == "left_only", "r0(nm)_1"
-    ]
-    merged_bonds.loc[
-        merged_bonds["source"] == "right_only", "r0(nm)_1"
-    ] = merged_bonds.loc[
-        merged_bonds["source"] == "right_only", "r0(nm)_2"
-    ]
+    if "Kb" in df_bonds_additional.columns:
+        merged_bonds["Kb"] = np.nanmax(
+            merged_bonds[["Kb_1", "Kb_2"]],
+            axis=1,
+        )
 
-    merged_bonds["r0(nm)"] = np.nanmean(
-        merged_bonds[["r0(nm)_1", "r0(nm)_2"]],
-        axis=1,
-    )
+    if "r0(nm)" in df_bonds_additional.columns:
+        merged_bonds.loc[
+            merged_bonds["source"] == "left_only", "r0(nm)_2"
+        ] = merged_bonds.loc[
+            merged_bonds["source"] == "left_only", "r0(nm)_1"
+        ]
+        merged_bonds.loc[
+            merged_bonds["source"] == "right_only", "r0(nm)_1"
+        ] = merged_bonds.loc[
+            merged_bonds["source"] == "right_only", "r0(nm)_2"
+        ]
+
+        merged_bonds["r0(nm)"] = np.nanmean(
+            merged_bonds[["r0(nm)_1", "r0(nm)_2"]],
+            axis=1,
+        )
 
     multibasin_top["bonds"] = merged_bonds[
-        ["ai", "aj", "func", "r0(nm)", "Kb"]
+        list(df_bonds_additional.columns)
     ].reset_index(drop=True)
+
+    if "bondtypes" in reference_top or "bondtypes" in additional_top:
+        multibasin_top["bondtypes"] = pandas.merge(
+            left=reference_top.get("bondtypes", pandas.DataFrame()),
+            right=additional_top.get("bondtypes", pandas.DataFrame()),
+            how="inner",
+            indicator=False,
+        ).reset_index(drop=True)
 
     return multibasin_top, multibasin_xml
 
