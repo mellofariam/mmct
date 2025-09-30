@@ -930,7 +930,7 @@ def _process_contacts(
     ):
         raise ValueError(
             "Contacts do not have the expected epsilon value. "
-            f"Expected: {EPSILON}, Found: {np.nanmean(df_reference['epsilon'])}"
+            f"Expected: {EPSILON}, Found: {np.nanmean(df_reference['epsilon'])}."
             "Make sure to choose the correct mode (CG or AA)."
         )
 
