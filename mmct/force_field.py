@@ -1502,3 +1502,84 @@ def xml2contacts(
 
     with open(filename, "w") as f:
         f.writelines(lines)
+
+def remove_dihedral(
+    xml: ET.ElementTree,
+) -> ET.ElementTree:
+    """
+    Remove dihedral interactions that may cause numerical instability.
+    When the angles in
+    """
+
+    def _strlist2tuple(*strlist: list) -> tuple:
+        return tuple(sorted(map(int, strlist)))
+
+    edited_xml = copy.deepcopy(xml)
+    root = edited_xml.getroot()
+
+    idx_in_faulty_angles = set()
+
+    for angle_type in root.findall(".//angles/angles_type"):
+        for interaction in angle_type.findall("interaction"):
+            if (
+                float(interaction.attrib["theta1"]) <= np.deg2rad(30)
+                or float(interaction.attrib["theta1"]) >= np.deg2rad(150)
+            ) or (
+                float(interaction.attrib["theta2"]) <= np.deg2rad(30)
+                or float(interaction.attrib["theta2"]) >= np.deg2rad(150)
+            ):
+                idx_in_faulty_angles.add(
+                    _strlist2tuple(
+                        interaction.attrib["i"],
+                        interaction.attrib["j"],
+                        interaction.attrib["k"],
+                    )
+                )
+
+    for dihedral_type in root.findall(".//dihedrals/dihedrals_type"):
+        modified_dihedrals = []
+        for element in dihedral_type:
+            if element.tag == "interaction":
+                dihedral_idx = set()
+
+                dihedral_idx.add(
+                    _strlist2tuple(
+                        element.attrib["j"],
+                        element.attrib["k"],
+                        element.attrib["l"],
+                    )
+                )
+                dihedral_idx.add(
+                    _strlist2tuple(
+                        element.attrib["i"],
+                        element.attrib["k"],
+                        element.attrib["l"],
+                    )
+                )
+                dihedral_idx.add(
+                    _strlist2tuple(
+                        element.attrib["i"],
+                        element.attrib["j"],
+                        element.attrib["l"],
+                    )
+                )
+                dihedral_idx.add(
+                    _strlist2tuple(
+                        element.attrib["i"],
+                        element.attrib["j"],
+                        element.attrib["k"],
+                    )
+                )
+
+                if (
+                    len(dihedral_idx.intersection(idx_in_faulty_angles))
+                    > 0
+                ):
+                    continue
+                else:
+                    modified_dihedrals.append(element)
+            else:
+                modified_dihedrals.append(element)
+        dihedral_type[:] = modified_dihedrals
+
+    return edited_xml
