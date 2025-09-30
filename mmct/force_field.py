@@ -43,7 +43,9 @@ def read_top(topfile: str) -> dict[str, pandas.DataFrame]:
             treat_comment_as_header = True
 
         elif current_section:
-            ff_params[current_section].append(line.split())
+            ff_params[current_section].append(
+                line.split(sep=";")[0].split()
+            )
 
     for section in ff_params.keys():
         ff_params[section] = pandas.DataFrame(
