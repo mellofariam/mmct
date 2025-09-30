@@ -880,19 +880,17 @@ def _process_contacts(
                 contacts_converted_to_reference["B"].append(
                     interaction.attrib["B"]
                 )
-    
+
     i_list = contacts_converted_to_reference["i"]
     j_list = contacts_converted_to_reference["j"]
-    contacts_converted_to_reference["sigma_reference"] =\
+    contacts_converted_to_reference["sigma_reference"] = (
         np.linalg.norm(
-            reference_pdb.loc[
-                i_list, ["x", "y", "z"]
-            ].values
-            - reference_pdb.loc[
-                j_list, ["x", "y", "z"]
-            ].values,
-            axis = 1
-        )* 0.1  # Convert to nm
+            reference_pdb.loc[i_list, ["x", "y", "z"]].values
+            - reference_pdb.loc[j_list, ["x", "y", "z"]].values,
+            axis=1,
+        )
+        * 0.1
+    )  # Convert to nm
 
     df_additional = pandas.DataFrame(
         data=contacts_converted_to_reference
@@ -937,32 +935,32 @@ def _process_contacts(
 
             ii = idx_from_reference_to_additional.get(i)
             jj = idx_from_reference_to_additional.get(j)
-    
+
     new_row = pandas.DataFrame([{}], index=[np.nan])
     additional_pdb_tmp = pandas.concat([additional_pdb, new_row])
 
-    ii_list = np.array([
-        idx_from_reference_to_additional.get(i)
-        for i in contacts_in_reference["i"]
+    ii_list = np.array(
+        [
+            idx_from_reference_to_additional.get(i)
+            for i in contacts_in_reference["i"]
         ],
-        dtype=float
+        dtype=float,
     )
-    jj_list = np.array([
-        idx_from_reference_to_additional.get(j)
-        for j in contacts_in_reference["j"]
+    jj_list = np.array(
+        [
+            idx_from_reference_to_additional.get(j)
+            for j in contacts_in_reference["j"]
         ],
-        dtype=float
+        dtype=float,
     )
-    contacts_in_reference["sigma_additional"] =\
+    contacts_in_reference["sigma_additional"] = (
         np.linalg.norm(
-            additional_pdb_tmp.loc[
-                ii_list, ["x", "y", "z"]
-            ].values
-            - additional_pdb_tmp.loc[
-                jj_list, ["x", "y", "z"]
-            ].values,
-            axis = 1
-        )* 0.1  # Convert to nm
+            additional_pdb_tmp.loc[ii_list, ["x", "y", "z"]].values
+            - additional_pdb_tmp.loc[jj_list, ["x", "y", "z"]].values,
+            axis=1,
+        )
+        * 0.1
+    )  # Convert to nm
 
     df_reference = pandas.DataFrame(data=contacts_in_reference)
     df_reference[["A", "B"]] = df_reference[["A", "B"]].astype(float)
