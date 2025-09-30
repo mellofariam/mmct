@@ -204,10 +204,12 @@ def _process_angles(
             angles_converted_to_reference["aj"].append(j)
             angles_converted_to_reference["ak"].append(k)
             angles_converted_to_reference["func"].append(row["func"])
-            angles_converted_to_reference["th0(deg)"].append(
-                row["th0(deg)"]
-            )
-            angles_converted_to_reference["Ka"].append(row["Ka"])
+
+            if "th0(deg)" in row and "Ka" in row:
+                angles_converted_to_reference["th0(deg)"].append(
+                    row["th0(deg)"]
+                )
+                angles_converted_to_reference["Ka"].append(row["Ka"])
 
     df_angles_additional = pandas.DataFrame(
         data=angles_converted_to_reference
@@ -215,9 +217,13 @@ def _process_angles(
     df_angles_additional[["ai", "aj", "ak", "func"]] = (
         df_angles_additional[["ai", "aj", "ak", "func"]].astype(int)
     )
-    df_angles_additional[["th0(deg)", "Ka"]] = df_angles_additional[
-        ["th0(deg)", "Ka"]
-    ].astype(float)
+    if (
+        "th0(deg)" in df_angles_additional.columns
+        and "Ka" in df_angles_additional.columns
+    ):
+        df_angles_additional[["th0(deg)", "Ka"]] = (
+            df_angles_additional[["th0(deg)", "Ka"]].astype(float)
+        )
 
     if "angles" in reference_top:
         df_angles_reference = reference_top["angles"].copy()
@@ -282,12 +288,18 @@ def _process_angles(
     merged_angles = pandas.merge(
         df_angles_reference,
         df_angles_additional,
-        left_on=["ai", "aj", "ak", "func", "Ka"],
-        right_on=["ai", "aj", "ak", "func", "Ka"],
+        left_on=["ai", "aj", "ak", "func"],
+        right_on=["ai", "aj", "ak", "func"],
         how="outer",
         suffixes=("_1", "_2"),
         indicator="source",
     )
+
+    if "Ka" in df_angles_additional.columns:
+        merged_angles["Ka"] = np.nanmax(
+            merged_angles[["Ka_1", "Ka_2"]],
+            axis=1,
+        )
 
     if "editable" in df_angles_reference.columns:
         # check if any of the angles in both structures are not editable
@@ -302,16 +314,17 @@ def _process_angles(
                 "This is not supported. "
             )
 
-    merged_angles.loc[
-        merged_angles["source"] == "left_only", "th0(deg)_2"
-    ] = merged_angles.loc[
-        merged_angles["source"] == "left_only", "th0(deg)_1"
-    ]
-    merged_angles.loc[
-        merged_angles["source"] == "right_only", "th0(deg)_1"
-    ] = merged_angles.loc[
-        merged_angles["source"] == "right_only", "th0(deg)_2"
-    ]
+    if "th0(deg)" in df_angles_additional.columns:
+        merged_angles.loc[
+            merged_angles["source"] == "left_only", "th0(deg)_2"
+        ] = merged_angles.loc[
+            merged_angles["source"] == "left_only", "th0(deg)_1"
+        ]
+        merged_angles.loc[
+            merged_angles["source"] == "right_only", "th0(deg)_1"
+        ] = merged_angles.loc[
+            merged_angles["source"] == "right_only", "th0(deg)_2"
+        ]
 
     if mode == "middle":
         merged_angles["th0(deg)"] = np.nanmean(
