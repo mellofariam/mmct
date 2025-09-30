@@ -1349,8 +1349,20 @@ def define_multibasin_model(
     multibasin_top = copy.deepcopy(reference_top)
     multibasin_xml = copy.deepcopy(reference_xml)
 
+    # For the bonds
+    print("Processing bonds...", flush=True, end="")
+    multibasin_top, multibasin_xml = _process_bonds(
+        reference_top,
+        additional_top,
+        multibasin_top,
+        idx_from_additional_to_reference,
+        multibasin_xml,
+    )
+    print(" Done.", flush=True)
+
     # For the angles
 
+    print("Processing angles...", flush=True, end="")
     multibasin_top, multibasin_xml = _process_angles(
         reference_top,
         additional_top,
@@ -1359,28 +1371,22 @@ def define_multibasin_model(
         multibasin_xml,
         mode_angles,
     )
-
-    # For the bonds
-
-    multibasin_top, multibasin_xml = _process_bonds(
-        reference_top,
-        additional_top,
-        multibasin_top,
-        idx_from_additional_to_reference,
-        multibasin_xml,
-    )
+    print(" Done.", flush=True)
 
     # For the dihedrals
 
+    print("Processing dihedrals...", flush=True, end="")
     multibasin_xml = _process_dihedrals(
         reference_xml,
         additional_xml,
         multibasin_xml,
         idx_from_additional_to_reference,
     )
+    print(" Done.", flush=True)
 
     # For the contacts
 
+    print("Processing contacts...", flush=True, end="")
     multibasin_xml, df_contacts = _process_contacts(
         reference_xml,
         reference_pdb,
@@ -1395,11 +1401,18 @@ def define_multibasin_model(
         xml=multibasin_xml,
         top=multibasin_top,
     )
+    print(" Done.", flush=True)
+
+    # Save the new files
+
+    print("Saving files...", flush=True, end="")
 
     save_top(multibasin_top, top_file)
     save_xml(multibasin_xml, xml_file)
 
     df_contacts.to_pickle(contact_file)
+
+    print(" Done.", flush=True)
 
     return multibasin_top, multibasin_xml, df_contacts
 
