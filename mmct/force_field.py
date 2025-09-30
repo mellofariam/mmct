@@ -384,6 +384,20 @@ def _process_angles(
             del multibasin_top["angles"]
 
         return multibasin_top, multibasin_xml
+    elif mode == "amber":
+        multibasin_top["angletypes"] = pandas.merge(
+            left=reference_top["angletypes"],
+            right=additional_top["angletypes"],
+            how="inner",
+            indicator=False,
+        ).reset_index(drop=True)
+
+        multibasin_top["angles"] = merged_angles[
+            ["ai", "aj", "ak", "func"]
+        ].reset_index(drop=True)
+
+        return multibasin_top, multibasin_xml
+
     else:
         raise ValueError(
             f"Unknown mode for angles: {mode}. "
