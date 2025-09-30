@@ -58,16 +58,36 @@ def read_top(topfile: str) -> dict[str, pandas.DataFrame]:
         ff_params["bonds"][["ai", "aj", "func"]] = ff_params["bonds"][
             ["ai", "aj", "func"]
         ].astype(int)
-        ff_params["bonds"][["r0(nm)", "Kb"]] = ff_params["bonds"][
-            ["r0(nm)", "Kb"]
-        ].astype(float)
+        try:
+            ff_params["bonds"][["r0(nm)", "Kb"]] = ff_params["bonds"][
+                ["r0(nm)", "Kb"]
+            ].astype(float)
+        except KeyError:
+            print(
+                "Warning: 'r0(nm)' or 'Kb' column not found in bonds section.",
+                flush=True,
+            )
+            print(
+                "Make sure 'bondtypes' are defined in the topology file.",
+                flush=True,
+            )
     if "angles" in ff_params:
         ff_params["angles"][["ai", "aj", "ak", "func"]] = ff_params[
             "angles"
         ][["ai", "aj", "ak", "func"]].astype(int)
-        ff_params["angles"][["th0(deg)", "Ka"]] = ff_params["angles"][
-            ["th0(deg)", "Ka"]
-        ].astype(float)
+        try:
+            ff_params["angles"][["th0(deg)", "Ka"]] = ff_params[
+                "angles"
+            ][["th0(deg)", "Ka"]].astype(float)
+        except KeyError:
+            print(
+                "Warning: 'th0(deg)' or 'Ka' column not found in angles section.",
+                flush=True,
+            )
+            print(
+                "Make sure 'angletypes' are defined in the topology file.",
+                flush=True,
+            )
 
     return ff_params
 
