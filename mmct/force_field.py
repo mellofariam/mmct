@@ -1306,11 +1306,17 @@ def load_force_field(
     pdb_file: str = "smog.pdb",
     top_file: str = "smog.top",
     xml_file: str = "smog.xml",
+    coarse_grain: bool = True,
+    ignore_HETATM: bool = True,
 ) -> tuple[
     pandas.DataFrame,
     dict[str, pandas.DataFrame],
     ET.ElementTree,
 ]:
+    pdb = pdb_tools.read_pdb(
+        pdb_file,
+        coarse_grain=coarse_grain,
+        ignore_HETATM=ignore_HETATM,
     pdb = pdb_tools.read_pdb(
         pdb_file, coarse_grain=True, ignore_HETATM=True
     )
