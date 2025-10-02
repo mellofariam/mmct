@@ -933,9 +933,6 @@ def _process_contacts(
             contacts_in_reference["A"].append(interaction.attrib["A"])
             contacts_in_reference["B"].append(interaction.attrib["B"])
 
-            ii = idx_from_reference_to_additional.get(i)
-            jj = idx_from_reference_to_additional.get(j)
-
     new_row = pandas.DataFrame([{}], index=[np.nan])
     additional_pdb_tmp = pandas.concat([additional_pdb, new_row])
 
