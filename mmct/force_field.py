@@ -1500,6 +1500,7 @@ def xml2contacts(
     with open(filename, "w") as f:
         f.writelines(lines)
 
+
 def remove_dihedral(
     xml: ET.ElementTree,
 ) -> ET.ElementTree:
@@ -1520,10 +1521,12 @@ def remove_dihedral(
         for interaction in angle_type.findall("interaction"):
             if (
                 float(interaction.attrib["theta1"]) <= np.deg2rad(30)
-                or float(interaction.attrib["theta1"]) >= np.deg2rad(150)
+                or float(interaction.attrib["theta1"])
+                >= np.deg2rad(150)
             ) or (
                 float(interaction.attrib["theta2"]) <= np.deg2rad(30)
-                or float(interaction.attrib["theta2"]) >= np.deg2rad(150)
+                or float(interaction.attrib["theta2"])
+                >= np.deg2rad(150)
             ):
                 idx_in_faulty_angles.add(
                     _strlist2tuple(
@@ -1569,7 +1572,11 @@ def remove_dihedral(
                 )
 
                 if (
-                    len(dihedral_idx.intersection(idx_in_faulty_angles))
+                    len(
+                        dihedral_idx.intersection(
+                            idx_in_faulty_angles
+                        )
+                    )
                     > 0
                 ):
                     continue
