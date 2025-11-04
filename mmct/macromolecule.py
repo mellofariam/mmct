@@ -818,3 +818,11 @@ class Complex(object):
                     file_mode="a",
                     add_END=False,
                 )
+
+    @property
+    def data(self):
+        combined_data = []
+        for original_chain_id in self.molecules.keys():
+            combined_data.append(self.molecules[original_chain_id].data)
+
+        return pandas.concat(combined_data, ignore_index=True)
