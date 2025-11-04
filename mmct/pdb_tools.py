@@ -2,8 +2,8 @@ import pandas
 from .macromolecule import Complex
 
 PDB_FORMATS = {
-    "coordinates": "{record:6s}{index:5d} {atom:4s} {residue:4s}{chain_id:1s}{residue_number:4d}    {x:8.3f}{y:8.3f}{z:8.3f} {occupancy:6.2f}{b_factor:6.2f}          {element:>2s}  \n",
-    "ter": "TER   {index:5d}      {residue:4s}{chain_id:1s}{residue_number:4d}\n",
+    "coordinates": "{record:6s}{index:>5} {atom:4s} {residue:4s}{chain_id:1s}{residue_number:4d}    {x:8.3f}{y:8.3f}{z:8.3f}{occupancy:6.2f}{b_factor:6.2f}          {element:>2s}  \n",
+    "ter": "TER   {index:>5}      {residue:4s}{chain_id:1s}{residue_number:4d}\n",
     "end": "END\n",
 }
 
@@ -182,10 +182,17 @@ def save_pdb(
             the PDB file. Defaults to True.
     """
 
+    def _format_index(i: int) -> str:
+        return (
+            str(index) if index < 100000 else hex(index).split("x")[1]
+        )
+
     with open(filename, file_mode) as pdb_file:
 
         index = 1
         previous_chain_id = None
+        previous_residue_number = None
+        previous_residue = None
         row = None
 
         for _, row in df.iterrows():
@@ -194,14 +201,16 @@ def save_pdb(
                 add_TER
                 and previous_chain_id != row.chain_id
                 and previous_chain_id is not None
+                and previous_residue_number is not None
+                and previous_residue is not None
             ):
                 # Only add TER if the chain has changed
                 pdb_file.write(
                     PDB_FORMATS["ter"].format(
                         index=index,
-                        residue=row.residue,
-                        chain_id=row.chain_id,
-                        residue_number=int(row.residue_number),
+                        residue=previous_residue,
+                        chain_id=previous_chain_id,
+                        residue_number=int(previous_residue_number),
                     )
                 )
                 index += 1
@@ -210,7 +219,7 @@ def save_pdb(
                 pdb_file.write(
                     PDB_FORMATS["coordinates"].format(
                         record="ATOM",
-                        index=index,
+                        index=_format_index(index),
                         atom=row.atom,
                         residue=row.residue,
                         chain_id=row.chain_id,
@@ -228,7 +237,7 @@ def save_pdb(
                 pdb_file.write(
                     PDB_FORMATS["coordinates"].format(
                         record=row.record,
-                        index=index,
+                        index=_format_index(index),
                         atom=row.atom,
                         residue=row.residue,
                         chain_id=row.chain_id,
@@ -244,11 +253,13 @@ def save_pdb(
                 index += 1
 
             previous_chain_id = row.chain_id
+            previous_residue_number = row.residue_number
+            previous_residue = row.residue
 
         if add_TER and row is not None:
             pdb_file.write(
                 PDB_FORMATS["ter"].format(
-                    index=index,
+                    index=_format_index(index),
                     residue=row.residue,
                     chain_id=row.chain_id,
                     residue_number=int(row.residue_number),
