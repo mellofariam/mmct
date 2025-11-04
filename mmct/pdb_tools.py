@@ -3,7 +3,7 @@ from .macromolecule import Complex
 
 PDB_FORMATS = {
     "coordinates": "{record:6s}{index:5d} {atom:4s} {residue:4s}{chain_id:1s}{residue_number:4d}    {x:8.3f}{y:8.3f}{z:8.3f} {occupancy:6.2f}{b_factor:6.2f}          {element:>2s}  \n",
-    "ter": "TER   {index:5d}      {residue:3s} {chain_id:1s}{residue_number:4d}\n",
+    "ter": "TER   {index:5d}      {residue:4s}{chain_id:1s}{residue_number:4d}\n",
     "end": "END\n",
 }
 
