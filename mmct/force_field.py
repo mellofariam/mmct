@@ -384,6 +384,7 @@ def _process_angles(
             del multibasin_top["angles"]
 
         return multibasin_top, multibasin_xml
+
     elif mode == "amber":
         multibasin_top["angletypes"] = pandas.merge(
             left=reference_top["angletypes"],
@@ -723,12 +724,15 @@ def _process_dihedrals(
             indicator="source",
         )
 
-        merged_dihedrals["weight"] = np.nanmax(
+        merged_dihedrals["weight"] = np.nanmin(
             merged_dihedrals[["weight_1", "weight_2"]],
             axis=1,
         )
         print(
-            "\n\tWarning: not dealing with differences in weight yet! Will not work for AA models."
+            "\n\tWarning: for AA models, only `dihedral_cosine` are "
+            "being re-weighted. The other dihedrals will use the `min` "
+            "weight. Will need to adjust that for planar dihedrals later",
+            flush=True,
         )
 
         merged_dihedrals.loc[
