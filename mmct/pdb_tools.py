@@ -199,7 +199,7 @@ def save_pdb(
             # Add TER records for the last residue in each chain if required
             if (
                 add_TER
-                and previous_chain_id != row.chain_id
+                and (previous_chain_id != row.chain_id or row.residue_number - previous_residue_number > 1)
                 and previous_chain_id is not None
                 and previous_residue_number is not None
                 and previous_residue is not None
