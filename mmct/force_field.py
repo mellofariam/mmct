@@ -1005,13 +1005,13 @@ def _process_contacts(
     """
 
     if mode == "CG":
-        EPSILON = 1.0
+        epsilon = 1.0
         POW_ATTRACTION = 10
         COEFF_ATTRACTION = 6
         POW_REPULSION = 12
         COEFF_REPULSION = 5
     elif mode == "AA":
-        EPSILON = 0.5
+        epsilon = 1.0  # will be adjusted later
         POW_ATTRACTION = 6
         COEFF_ATTRACTION = 2
         POW_REPULSION = 12
@@ -1024,7 +1024,7 @@ def _process_contacts(
         )
 
     def contact_energy(r, sigma):
-        return EPSILON * (
+        return epsilon * (
             COEFF_REPULSION * (sigma / r) ** POW_REPULSION
             - COEFF_ATTRACTION * (sigma / r) ** POW_ATTRACTION
         )
@@ -1060,14 +1060,13 @@ def _process_contacts(
         "j": [],
         "A": [],
         "B": [],
-        # "sigma_reference": [],
     }
 
     for contact_type in additional_root.findall(
         ".//contacts/contacts_type"
     ):
         for interaction in contact_type.findall("interaction"):
-            # Convert dihedral indices from additional to reference
+            # Convert contact indices from additional to reference
 
             ii = int(interaction.attrib["i"])
             jj = int(interaction.attrib["j"])
@@ -1075,7 +1074,7 @@ def _process_contacts(
             i = idx_from_additional_to_reference.get(ii)
             j = idx_from_additional_to_reference.get(jj)
 
-            # when going thru additional, there's no optional of
+            # when going thru additional, there's no option of
             # sigma_reference not existing if sigma_additional exists
             if i is not None and j is not None:
                 contacts_converted_to_reference["i"].append(min(i, j))
@@ -1120,7 +1119,6 @@ def _process_contacts(
         "j": [],
         "A": [],
         "B": [],
-        # "sigma_additional": [],
     }
 
     idx_from_reference_to_additional = {
@@ -1189,13 +1187,12 @@ def _process_contacts(
 
     df_reference.drop(["A", "B"], axis=1, inplace=True)
 
-    if not np.isclose(
-        np.nanmean(df_reference["epsilon"]), EPSILON, atol=0.01
+    if mode == "CG" and not np.isclose(
+        np.nanmean(df_reference["epsilon"]), epsilon, atol=0.01
     ):
-        raise ValueError(
-            "Contacts do not have the expected epsilon value. "
-            f"Expected: {EPSILON}, Found: {np.nanmean(df_reference['epsilon'])}."
-            "Make sure to choose the correct mode (CG or AA)."
+        print(
+            "Warning! Contacts do not have the expected epsilon value for a CG model."
+            f"Expected: {epsilon}, Found: {np.nanmean(df_reference['epsilon'])}."
         )
 
     # Merge the two DataFrames on i, j
@@ -1300,12 +1297,12 @@ def _process_contacts(
     ## for the cases where the eps_iso/eps <= 0.5
     # when both contacts are called by Shadow, go back to the lower distance
     merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
         & (merged_contacts["source"] == "both"),
         "sigma_iso",
     ] = np.min(
         merged_contacts.loc[
-            (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+            (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
             & (merged_contacts["source"] == "both"),
             ["sigma_reference", "sigma_additional"],
         ].values,
@@ -1314,20 +1311,20 @@ def _process_contacts(
     # when only one of the contacts is called by Shadow
     # go back to that one
     merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
         & (merged_contacts["source"] == "left_only"),
         "sigma_iso",
     ] = merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
         & (merged_contacts["source"] == "left_only"),
         "sigma_reference",
     ].values
     merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
         & (merged_contacts["source"] == "right_only"),
         "sigma_iso",
     ] = merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * EPSILON)
+        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
         & (merged_contacts["source"] == "right_only"),
         "sigma_additional",
     ].values
@@ -1367,14 +1364,69 @@ def _process_contacts(
         "source",
     ] = "right_only"
 
+    if mode == "AA":
+        print(
+            "\n\tAdjusting epsilon_c and dihedral weights for AA model...",
+            end=" ",
+            flush=True,
+        )
+
+        # adjust epsilon and the weight of the dihedrals
+        num_common_contacts = len(
+            merged_contacts.loc[merged_contacts["source"] == "both"]
+        )
+
+        dihedrals, df_dihedrals = _count_dihedrals(
+            reference_pdb, multibasin_xml
+        )
+        num_backbone_dihedrals = (
+            dihedrals["protein_bb"] + dihedrals["nucleic_bb"]
+        )
+
+        Nc = num_common_contacts
+        Nbb = num_backbone_dihedrals
+        Nscp = dihedrals["protein_sc"]
+        Nscn = dihedrals["nucleic_sc"]
+
+        N = len(reference_pdb)
+
+        # variables: [Ec, Ebb, Escp, Escn]
+        A = [
+            [0, 1, 0, -1],
+            [0, 1, -2, 0],
+            [Nc, 2 * Nbb, -2 * Nscp, -2 * Nscn],
+            [Nc, Nbb, Nscp, Nscn],
+        ]
+        b = [0, 0, 0, N]
+        solution = np.linalg.solve(A, b)
+        epsilon, weight_bb, weight_scp, weight_scn = solution
+
+        df_dihedrals["epsilon"] = weight_bb
+        df_dihedrals.loc[
+            (df_dihedrals["molecule_type"] == "protein")
+            & (df_dihedrals["dihedral_type"] == "sc"),
+            "epsilon",
+        ] = weight_scp
+        df_dihedrals.loc[
+            (df_dihedrals["molecule_type"] == "nucleic")
+            & (df_dihedrals["dihedral_type"] == "sc"),
+            "epsilon",
+        ] = weight_scn
+
+        multibasin_xml = _update_dihedral_weights(
+            multibasin_xml,
+            df_dihedrals,
+        )
+        print("Done.", flush=True)
+
     # calculate the new A and B parameters
     merged_contacts["A"] = (
-        EPSILON
+        epsilon
         * COEFF_REPULSION
         * merged_contacts["sigma_iso"] ** POW_REPULSION
     )
     merged_contacts["B"] = (
-        EPSILON
+        epsilon
         * COEFF_ATTRACTION
         * merged_contacts["sigma_iso"] ** POW_ATTRACTION
     )
