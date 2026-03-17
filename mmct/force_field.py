@@ -1775,12 +1775,21 @@ def xml2contacts(
         f.writelines(lines)
 
 
-def remove_dihedral(
+def remove_unstable_dihedrals(
     xml: ET.ElementTree,
+    top: dict[str, pandas.DataFrame] | None = None,
 ) -> ET.ElementTree:
     """
     Remove dihedral interactions that may cause numerical instability.
-    When the angles in
+    When the angles in a dihedral are close to 0 or 180 degrees,
+    the dihedral potential can become very steep, leading to
+    numerical instability during simulations.
+
+    Args:
+        xml (ET.ElementTree): The XML tree containing dihedral information.
+        top (dict[str, pandas.DataFrame] | None): The topology dictionary containing the angle information, if that is not defined in the xml.
+    Returns:
+        ET.ElementTree: The modified XML tree with specified dihedrals removed.
     """
 
     def _strlist2tuple(*strlist: list) -> tuple:
@@ -1807,6 +1816,21 @@ def remove_dihedral(
                         interaction.attrib["i"],
                         interaction.attrib["j"],
                         interaction.attrib["k"],
+                    )
+                )
+
+    if (
+        top is not None
+        and "angles" in top
+        and "th0(deg)" in top["angles"]
+    ):
+        for row in top["angles"].itertuples():
+            if (row["th0(deg)"] <= 30) or (row["th0(deg)"] >= 150):
+                idx_in_faulty_angles.add(
+                    _strlist2tuple(
+                        row.ai,
+                        row.aj,
+                        row.ak,
                     )
                 )
 
