@@ -786,6 +786,147 @@ def _process_dihedrals(
     return multibasin_xml
 
 
+def _count_dihedrals(
+    reference_pdb: pandas.DataFrame, xml: ET.ElementTree
+) -> tuple[dict[str, int], pandas.DataFrame]:
+    """
+    Counts the number of protein and nucleic dihedrals in the force field.
+
+    Args:
+        reference_pdb (pandas.DataFrame): DataFrame containing the reference PDB data.
+        xml (ET.ElementTree): The XML tree containing the force field parameters.
+    Returns:
+        tuple: A tuple containing the number of protein dihedrals and
+               the number of nucleic dihedrals.
+    """
+
+    xml_root = xml.getroot()
+    if xml_root is None:
+        raise ValueError("The XML tree is empty or malformed.")
+
+    dihedral_cosine_data = {
+        "i": [],
+        "j": [],
+        "k": [],
+        "l": [],
+        "theta0": [],
+        "weight": [],
+    }
+    for dihedral_coside in xml_root.findall(
+        ".//dihedrals/dihedrals_type[@name='dihedral_cosine']/interaction"
+    ):
+        # only count the dihedrals with multiplicity 1
+        if dihedral_coside.attrib["multiplicity"] == "1":
+            dihedral_cosine_data["i"].append(
+                int(dihedral_coside.attrib["i"])
+            )
+            dihedral_cosine_data["j"].append(
+                int(dihedral_coside.attrib["j"])
+            )
+            dihedral_cosine_data["k"].append(
+                int(dihedral_coside.attrib["k"])
+            )
+            dihedral_cosine_data["l"].append(
+                int(dihedral_coside.attrib["l"])
+            )
+            dihedral_cosine_data["theta0"].append(
+                float(dihedral_coside.attrib["theta0"])
+            )
+            dihedral_cosine_data["weight"].append(
+                float(dihedral_coside.attrib["weight"])
+            )
+
+    df_dihedral_cosine = pandas.DataFrame(data=dihedral_cosine_data)
+    df_dihedral_cosine["group"] = df_dihedral_cosine.groupby(
+        ["j", "k"]
+    )["j"].transform("size")
+
+    df_dihedral_cosine["group_weight"] = (
+        1 / df_dihedral_cosine["group"]
+    )
+
+    df_dihedral_cosine["residue_i"] = reference_pdb.loc[
+        df_dihedral_cosine["i"], "residue"
+    ].values
+
+    df_dihedral_cosine["molecule_type"] = "protein"
+
+    # fmt: off
+    nucleic_residues = [
+        "A", "C", "G", "U", 
+        "AM", "CM", "GM", "UM", 
+        "A0P", "C0P", "G0P", "U0P",
+        "A0PM", "C0PM", "G0PM", "U0PM",
+    ]
+    # fmt: on
+
+    df_dihedral_cosine.loc[
+        df_dihedral_cosine["residue_i"].isin(nucleic_residues),
+        "molecule_type",
+    ] = "nucleic"
+
+    df_dihedral_cosine["atom_i"] = reference_pdb.loc[
+        df_dihedral_cosine["i"], "atom"
+    ].values
+    df_dihedral_cosine["atom_j"] = reference_pdb.loc[
+        df_dihedral_cosine["j"], "atom"
+    ].values
+    df_dihedral_cosine["atom_k"] = reference_pdb.loc[
+        df_dihedral_cosine["k"], "atom"
+    ].values
+    df_dihedral_cosine["atom_l"] = reference_pdb.loc[
+        df_dihedral_cosine["l"], "atom"
+    ].values
+
+    protein_backbone_atoms = {"N", "CA", "C", "O", "OXT"}
+    nucleic_backbone_atoms = {
+        # fmt: off
+        "P", "O1P", "O2P", "O5*", "C5*", "C4*", "O4*", 
+        "C3*", "O3*", "C2*", "O2*", "C1*", "O3P",
+        # fmt: on
+    }
+
+    df_dihedral_cosine["dihedral_type"] = "sc"
+    df_dihedral_cosine.loc[
+        df_dihedral_cosine[["atom_i", "atom_j", "atom_k", "atom_l"]]
+        .isin(protein_backbone_atoms)
+        .all(axis=1),
+        "dihedral_type",
+    ] = "bb"
+    df_dihedral_cosine.loc[
+        df_dihedral_cosine[["atom_i", "atom_j", "atom_k", "atom_l"]]
+        .isin(nucleic_backbone_atoms)
+        .all(axis=1),
+        "dihedral_type",
+    ] = "bb"
+
+    dihedral_numbers = {
+        "protein_bb": df_dihedral_cosine.loc[
+            (df_dihedral_cosine["molecule_type"] == "protein")
+            & (df_dihedral_cosine["dihedral_type"] == "bb"),
+            "group_weight",
+        ].sum(),
+        "protein_sc": df_dihedral_cosine.loc[
+            (df_dihedral_cosine["molecule_type"] == "protein")
+            & (df_dihedral_cosine["dihedral_type"] == "sc"),
+            "group_weight",
+        ].sum(),
+        "nucleic_bb": df_dihedral_cosine.loc[
+            (df_dihedral_cosine["molecule_type"] == "nucleic")
+            & (df_dihedral_cosine["dihedral_type"] == "bb"),
+            "group_weight",
+        ].sum(),
+        "nucleic_sc": df_dihedral_cosine.loc[
+            (df_dihedral_cosine["molecule_type"] == "nucleic")
+            & (df_dihedral_cosine["dihedral_type"] == "sc"),
+            "group_weight",
+        ].sum(),
+        "total": len(df_dihedral_cosine),
+    }
+
+    return dihedral_numbers, df_dihedral_cosine
+
+
 def _process_contacts(
     reference_xml: ET.ElementTree,
     reference_pdb: pandas.DataFrame,
