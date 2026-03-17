@@ -1517,7 +1517,8 @@ def _update_exclusions(
 def scale_contacts(
     xml: ET.ElementTree,
     atom_pairs: np.ndarray,
-    scale_by: float = 1.0,
+    scale_by: float | None = None,
+    scale_to: float | None = None,
 ) -> ET.ElementTree:
     """
     Scales the contact strength in the XML file by a given scale factor.
@@ -1530,6 +1531,20 @@ def scale_contacts(
     Returns:
         ET.ElementTree: The modified XML tree with scaled contacts.
     """
+    if scale_by is not None and scale_to is not None:
+        raise ValueError(
+            "Only one of `scale_by` or `scale_to` should be provided."
+        )
+    if scale_to is not None and scale_by is None:
+        if scale_to <= 0:
+            raise ValueError("`scale_to` must be greater than zero.")
+        scale = lambda x: scale_to
+    elif scale_to is None and scale_by is not None:
+        scale = lambda x: scale_by * float(x)
+    else:
+        raise ValueError(
+            "Either `scale_by` or `scale_to` must be provided."
+        )
 
     edited_xml = copy.deepcopy(xml)
 
@@ -1553,10 +1568,10 @@ def scale_contacts(
 
             if tuple(sorted([i, j])) in contacts_to_scale:
                 interaction.attrib["A"] = (
-                    f"{scale_by * float(interaction.attrib['A']):.5e}"
+                    f"{scale(interaction.attrib['A']):.5e}"
                 )
                 interaction.attrib["B"] = (
-                    f"{scale_by * float(interaction.attrib['B']):.5e}"
+                    f"{scale(interaction.attrib['B']):.5e}"
                 )
 
     return edited_xml
