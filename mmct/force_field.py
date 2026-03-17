@@ -927,6 +927,68 @@ def _count_dihedrals(
     return dihedral_numbers, df_dihedral_cosine
 
 
+def _update_dihedral_weights(
+    multibasin_xml: ET.ElementTree,
+    df_dihedral_cosine: pandas.DataFrame,
+) -> ET.ElementTree:
+    """
+    Updates the dihedral parameters in the multibasin XML tree
+    based on the provided dihedral DataFrame and epsilon values.
+
+    Args:
+        multibasin_xml (ET.ElementTree): The XML tree to update.
+        df_dihedral_cosine (pandas.DataFrame): DataFrame containing dihedral information.
+        epsilon_bb (float): Epsilon value for backbone dihedrals.
+        epsilon_sc_protein (float): Epsilon value for protein sidechain dihedrals.
+        epsilon_sc_nucleic (float): Epsilon value for nucleic sidechain dihedrals.
+
+    Returns:
+        ET.ElementTree: The updated XML tree.
+    """
+
+    multibasin_root = multibasin_xml.getroot()
+    if multibasin_root is None:
+        raise ValueError(
+            "The multibasin XML tree is empty or malformed."
+        )
+
+    df_dihedral_cosine = df_dihedral_cosine.set_index(
+        ["i", "j", "k", "l"]
+    )
+    df_dihedral_cosine["updated_weight"] = (
+        df_dihedral_cosine["group_weight"]
+        * df_dihedral_cosine["epsilon"]
+    )
+
+    for dihedral_type in multibasin_root.findall(
+        f".//dihedrals/dihedrals_type/[@name='dihedral_cosine']"
+    ):
+        modified_dihedrals = []
+
+        for element in dihedral_type:
+            if element.tag != "interaction":
+                modified_dihedrals.append(element)
+            else:
+                i = int(element.attrib["i"])
+                j = int(element.attrib["j"])
+                k = int(element.attrib["k"])
+                l = int(element.attrib["l"])
+
+                row = df_dihedral_cosine.loc[(i, j, k, l)]
+
+                if float(element.attrib["multiplicity"]) == 3:
+                    updated_weight = 0.5 * row["updated_weight"]
+                else:
+                    updated_weight = row["updated_weight"]
+
+                element.attrib["weight"] = f"{updated_weight:.5e}"
+                modified_dihedrals.append(element)
+
+        dihedral_type[:] = modified_dihedrals
+
+    return multibasin_xml
+
+
 def _process_contacts(
     reference_xml: ET.ElementTree,
     reference_pdb: pandas.DataFrame,
