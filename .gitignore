@@ -1,14 +1,3 @@
-mmct/__pycache__/__init__.cpython-312.pyc
-mmct/__pycache__/force_field.cpython-312.pyc
-mmct/__pycache__/macromolecule.cpython-312.pyc
-mmct/__pycache__/pdb_tools.cpython-312.pyc
-mmct/mmct.egg-info/dependency_links.txt
-mmct/mmct.egg-info/PKG-INFO
-mmct/mmct.egg-info/requires.txt
-mmct/mmct.egg-info/SOURCES.txt
-mmct/mmct.egg-info/top_level.txt
-mmct.egg-info/dependency_links.txt
-mmct.egg-info/PKG-INFO
-mmct.egg-info/requires.txt
-mmct.egg-info/SOURCES.txt
-mmct.egg-info/top_level.txt
+*/__pycache__/
+mmct.egg-info/
+build/
