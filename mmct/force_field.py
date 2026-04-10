@@ -1237,11 +1237,19 @@ def _process_contacts(
         np.mean(
             np.isclose(
                 merged_contacts.loc[
-                    merged_contacts.source == "both",
+                    (
+                        (merged_contacts.source == "both")
+                        & merged_contacts["sigma_additional_1"].notna()
+                        & merged_contacts["sigma_additional_2"].notna()
+                    ),
                     "sigma_additional_1",
                 ],
                 merged_contacts.loc[
-                    merged_contacts.source == "both",
+                    (
+                        (merged_contacts.source == "both")
+                        & merged_contacts["sigma_additional_1"].notna()
+                        & merged_contacts["sigma_additional_2"].notna()
+                    ),
                     "sigma_additional_2",
                 ],
                 atol=0.01,
