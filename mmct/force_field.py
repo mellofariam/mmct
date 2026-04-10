@@ -1178,11 +1178,6 @@ def _process_contacts(
         / COEFF_REPULSION
     ) ** (1 / (POW_REPULSION - POW_ATTRACTION))
 
-    # pair is not in the additional PDB, use reference distance
-    df_reference["sigma_additional"] = df_reference[
-        "sigma_additional"
-    ].fillna(df_reference["sigma_reference"])
-
     df_reference["epsilon"] = (
         df_reference["A"]
         / COEFF_REPULSION
