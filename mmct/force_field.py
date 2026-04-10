@@ -1232,7 +1232,10 @@ def _process_contacts(
 
     else:
         raise ValueError(
-            "Inconsistent values of sigma_reference in the reference and additional XML files."
+            "Inconsistent values of sigma_reference found! "
+            "This indicates that the distances inferred from the contact interactions in the "
+            "reference XML are not consistent with the distances from the reference PDB. "
+            "Please check the input files."
         )
 
     if (
@@ -1258,7 +1261,10 @@ def _process_contacts(
 
     else:
         raise ValueError(
-            "Inconsistent values of sigma_additional in the reference and additional XML files."
+            "Inconsistent values of sigma_additional found! "
+            "This indicates that the distances inferred from the contact interactions in the "
+            "additional XML are not consistent with the distances from the additional PDB. "
+            "Please check the input files."
         )
 
     assert (
