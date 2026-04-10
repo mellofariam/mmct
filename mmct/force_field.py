@@ -997,6 +997,7 @@ def _process_contacts(
     multibasin_xml: ET.ElementTree,
     idx_from_additional_to_reference: dict[int, int],
     mode="CG",
+    scale_distances=1.0,
 ) -> tuple[ET.ElementTree, pandas.DataFrame]:
     """
     Processes contacts from the reference and additional XML files,
@@ -1095,8 +1096,8 @@ def _process_contacts(
             - reference_pdb.loc[j_list, ["x", "y", "z"]].values,
             axis=1,
         )
-        * 0.1
-    )  # Convert to nm
+        * 0.1  # Convert to nm
+    ) * scale_distances
 
     df_additional = pandas.DataFrame(
         data=contacts_converted_to_reference
@@ -1161,8 +1162,8 @@ def _process_contacts(
             - additional_pdb_tmp.loc[jj_list, ["x", "y", "z"]].values,
             axis=1,
         )
-        * 0.1
-    )  # Convert to nm
+        * 0.1  # Convert to nm
+    ) * scale_distances
 
     df_reference = pandas.DataFrame(data=contacts_in_reference)
     df_reference[["A", "B"]] = df_reference[["A", "B"]].astype(float)
@@ -1668,6 +1669,7 @@ def define_multibasin_model(
     xml_file: str = "smog.xml",
     top_file: str = "smog.top",
     contact_file: str = "contacts.pkl",
+    scale_contact_distances: float = 1.0,
 ) -> tuple[
     dict[str, pandas.DataFrame], ET.ElementTree, pandas.DataFrame
 ]:
@@ -1724,6 +1726,7 @@ def define_multibasin_model(
         multibasin_xml,
         idx_from_additional_to_reference,
         mode_contacts,
+        scale_contact_distances,
     )
 
     multibasin_top = _update_exclusions(
