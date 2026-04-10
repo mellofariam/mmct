@@ -1225,12 +1225,11 @@ def _process_contacts(
         )
         == 1.0
     ):
-        merged_contacts["sigma_reference"] = np.nanmin(
-            merged_contacts[
-                ["sigma_reference_1", "sigma_reference_2"]
-            ],
-            axis=1,
-        )
+        # prioritize the distance from the PDB
+        merged_contacts["sigma_reference"] = merged_contacts[
+            "sigma_reference_2"
+        ].combine_first(merged_contacts["sigma_reference_1"])
+
     else:
         raise ValueError(
             "Inconsistent values of sigma_reference in the reference and additional XML files."
@@ -1252,12 +1251,11 @@ def _process_contacts(
         )
         == 1.0
     ):
-        merged_contacts["sigma_additional"] = np.nanmin(
-            merged_contacts[
-                ["sigma_additional_1", "sigma_additional_2"]
-            ],
-            axis=1,
-        )
+        # prioritize the distance from the PDB
+        merged_contacts["sigma_additional"] = merged_contacts[
+            "sigma_additional_1"
+        ].combine_first(merged_contacts["sigma_additional_2"])
+
     else:
         raise ValueError(
             "Inconsistent values of sigma_additional in the reference and additional XML files."
