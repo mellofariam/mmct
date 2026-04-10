@@ -1279,23 +1279,23 @@ def _process_contacts(
 
     # common contacts
 
-    where_r1_r2_equal = (
-        merged_contacts["sigma_reference"]
-        == merged_contacts["sigma_additional"]
+    equal_distances = (
+        merged_contacts["sigma_reference"] == merged_contacts["sigma_additional"]
     )
 
-    merged_contacts.loc[where_r1_r2_equal, "sigma_iso"] = (
-        merged_contacts.loc[where_r1_r2_equal, "sigma_reference"]
+    merged_contacts.loc[equal_distances, "sigma_iso"] = merged_contacts.loc[
+        equal_distances, "sigma_reference"
+    ]
+    merged_contacts.loc[~equal_distances, "sigma_iso"] = isoenergetic_distance(
+        merged_contacts.loc[~equal_distances, "sigma_reference"],
+        merged_contacts.loc[~equal_distances, "sigma_additional"],
     )
-    merged_contacts.loc[~where_r1_r2_equal, "sigma_iso"] = (
-        isoenergetic_distance(
-            merged_contacts.loc[
-                ~where_r1_r2_equal, "sigma_reference"
-            ],
-            merged_contacts.loc[
-                ~where_r1_r2_equal, "sigma_additional"
-            ],
-        )
+
+    # clean NaN for the contacts that are not in the additional PDB
+    merged_contacts["sigma_iso"] = (
+        merged_contacts["sigma_iso"]
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(merged_contacts["sigma_reference"])
     )
 
     merged_contacts["epsilon_iso"] = np.abs(
@@ -1305,75 +1305,56 @@ def _process_contacts(
         )
     )
 
-    ## for the cases where the eps_iso/eps <= 0.5
-    # when both contacts are called by Shadow, go back to the lower distance
+    ## for the cases where the eps_iso/eps > 0.5
+    # fix assignments for the cases where contacts are called in only ones
+    # of the structures, but the isoenergetic distance indicates that the
+    # contact is a common contact
     merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
-        & (merged_contacts["source"] == "both"),
-        "sigma_iso",
-    ] = np.min(
-        merged_contacts.loc[
-            (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
-            & (merged_contacts["source"] == "both"),
-            ["sigma_reference", "sigma_additional"],
-        ].values,
-        axis=1,
-    )
-    # when only one of the contacts is called by Shadow
-    # go back to that one
-    merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
-        & (merged_contacts["source"] == "left_only"),
-        "sigma_iso",
-    ] = merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
-        & (merged_contacts["source"] == "left_only"),
-        "sigma_reference",
-    ].values
-    merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
-        & (merged_contacts["source"] == "right_only"),
-        "sigma_iso",
-    ] = merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] <= 0.5 * epsilon)
-        & (merged_contacts["source"] == "right_only"),
-        "sigma_additional",
-    ].values
-
-    # fix source assignment
-    merged_contacts.loc[
-        (
-            (
-                merged_contacts["sigma_iso"]
-                != merged_contacts["sigma_reference"]
-            )
-            & (
-                merged_contacts["sigma_iso"]
-                != merged_contacts["sigma_additional"]
-            )
-        ),
+        (merged_contacts["epsilon_iso"] > 0.5 * epsilon)
+        & (merged_contacts["sigma_additional"].notna()),
         "source",
     ] = "both"
 
+    ## for the cases where the eps_iso/eps <= 0.5
+    # when only one of the contacts is called by Shadow, go back to that one
+    non_unique_called_in_left = (merged_contacts["epsilon_iso"] <= 0.5 * epsilon) & (
+        merged_contacts["source"] == "left_only"
+    )
     merged_contacts.loc[
-        merged_contacts["sigma_iso"]
-        == merged_contacts["sigma_reference"],
-        "source",
-    ] = "left_only"
+        non_unique_called_in_left,
+        "sigma_iso",
+    ] = merged_contacts.loc[
+        non_unique_called_in_left,
+        "sigma_reference",
+    ].values
 
+    non_unique_called_in_right = (merged_contacts["epsilon_iso"] <= 0.5 * epsilon) & (
+        merged_contacts["source"] == "right_only"
+    )
     merged_contacts.loc[
-        (
-            (
-                merged_contacts["sigma_iso"]
-                != merged_contacts["sigma_reference"]
-            )
-            & (
-                merged_contacts["sigma_iso"]
-                == merged_contacts["sigma_additional"]
-            )
-        ),
-        "source",
-    ] = "right_only"
+        non_unique_called_in_right,
+        "sigma_iso",
+    ] = merged_contacts.loc[
+        non_unique_called_in_right,
+        "sigma_additional",
+    ].values
+
+    # when both contacts are called by Shadow, go back to the lower distance
+    non_unique_called_in_both = (merged_contacts["epsilon_iso"] <= 0.5 * epsilon) & (
+        merged_contacts["source"] == "both"
+    )
+
+    left_distance = merged_contacts.loc[non_unique_called_in_both, "sigma_reference"]
+    right_distance = merged_contacts.loc[non_unique_called_in_both, "sigma_additional"]
+    fix_non_unique_called_in_both = left_distance <= right_distance
+
+    merged_contacts.loc[non_unique_called_in_both, "sigma_iso"] = left_distance.where(
+        fix_non_unique_called_in_both, right_distance
+    )
+
+    merged_contacts.loc[non_unique_called_in_both, "source"] = np.where(
+        fix_non_unique_called_in_both, "left_only", "right_only"
+    )
 
     if mode == "AA":
         print(
