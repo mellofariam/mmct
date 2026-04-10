@@ -1139,8 +1139,9 @@ def _process_contacts(
             contacts_in_reference["A"].append(interaction.attrib["A"])
             contacts_in_reference["B"].append(interaction.attrib["B"])
 
-    new_row = pandas.DataFrame([{}], index=[np.nan])
-    additional_pdb_tmp = pandas.concat([additional_pdb, new_row])
+    # convert index to float to allow NaN and add NaN row
+    nan_row = pandas.DataFrame([{}], index=[np.nan])
+    float_indexed_additional_pdb = pandas.concat([additional_pdb, nan_row])
 
     ii_list = np.array(
         [
@@ -1156,10 +1157,12 @@ def _process_contacts(
         ],
         dtype=float,
     )
+
+    # this will give NaN for the contacts that are not in the additional PDB
     contacts_in_reference["sigma_additional"] = (
         np.linalg.norm(
-            additional_pdb_tmp.loc[ii_list, ["x", "y", "z"]].values
-            - additional_pdb_tmp.loc[jj_list, ["x", "y", "z"]].values,
+            float_indexed_additional_pdb.loc[ii_list, ["x", "y", "z"]].values
+            - float_indexed_additional_pdb.loc[jj_list, ["x", "y", "z"]].values,
             axis=1,
         )
         * 0.1  # Convert to nm
