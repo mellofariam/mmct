@@ -1273,9 +1273,9 @@ def _process_contacts(
     assert (
         merged_contacts["sigma_reference"].notna().all()
     ), "NaN found in sigma_reference."
-    assert (
-        merged_contacts["sigma_additional"].notna().all()
-    ), "NaN found in sigma_additional."
+
+    # reminder: we can have NaN in sigma_additional for the contacts
+    # that are not in the additional PDB
 
     # common contacts
 
