@@ -998,7 +998,8 @@ def _process_contacts(
     idx_from_additional_to_reference: dict[int, int],
     mode="CG",
     scale_distances=1.0,
-) -> tuple[ET.ElementTree, pandas.DataFrame]:
+    return_merged_contacts=False,
+) -> tuple[ET.ElementTree, pandas.DataFrame] | tuple[ET.ElementTree, pandas.DataFrame, pandas.DataFrame]:
     """
     Processes contacts from the reference and additional XML files,
     converting them to the reference indices and merging them.
@@ -1467,7 +1468,10 @@ def _process_contacts(
         # 3) In one go, reassign the children of dihedral_type
         contact_type[:] = edited_contacts
 
-    return multibasin_xml, pandas.DataFrame(contact_information)
+    if return_merged_contacts:
+        return multibasin_xml, pandas.DataFrame(contact_information), merged_contacts
+    else:
+        return multibasin_xml, pandas.DataFrame(contact_information)
 
 
 def _update_exclusions(
