@@ -1790,7 +1790,7 @@ def remove_unstable_dihedrals(
         ET.ElementTree: The modified XML tree with specified dihedrals removed.
     """
 
-    def _strlist2tuple(*strlist: list) -> tuple:
+    def _strlist2tuple(*strlist: str) -> tuple:
         return tuple(sorted(map(int, strlist)))
 
     edited_xml = copy.deepcopy(xml)
