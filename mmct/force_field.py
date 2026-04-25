@@ -998,6 +998,7 @@ def _process_contacts(
     idx_from_additional_to_reference: dict[int, int],
     mode="CG",
     scale_distances=1.0,
+    iso_energy_threshold = 0.5,
     return_merged_contacts=False,
 ) -> tuple[ET.ElementTree, pandas.DataFrame] | tuple[ET.ElementTree, pandas.DataFrame, pandas.DataFrame]:
     """
@@ -1306,19 +1307,19 @@ def _process_contacts(
         )
     )
 
-    ## for the cases where the eps_iso/eps > 0.5
+    ## for the cases where the eps_iso/eps > iso_energy_threshold
     # fix assignments for the cases where contacts are called in only ones
     # of the structures, but the isoenergetic distance indicates that the
     # contact is a common contact
     merged_contacts.loc[
-        (merged_contacts["epsilon_iso"] > 0.5 * epsilon)
+        (merged_contacts["epsilon_iso"] > iso_energy_threshold * epsilon)
         & (merged_contacts["sigma_additional"].notna()),
         "source",
     ] = "both"
 
-    ## for the cases where the eps_iso/eps <= 0.5
+    ## for the cases where the eps_iso/eps <= iso_energy_threshold
     # when only one of the contacts is called by Shadow, go back to that one
-    non_unique_called_in_left = (merged_contacts["epsilon_iso"] <= 0.5 * epsilon) & (
+    non_unique_called_in_left = (merged_contacts["epsilon_iso"] <= iso_energy_threshold * epsilon) & (
         merged_contacts["source"] == "left_only"
     )
     merged_contacts.loc[
@@ -1329,7 +1330,7 @@ def _process_contacts(
         "sigma_reference",
     ].values
 
-    non_unique_called_in_right = (merged_contacts["epsilon_iso"] <= 0.5 * epsilon) & (
+    non_unique_called_in_right = (merged_contacts["epsilon_iso"] <= iso_energy_threshold * epsilon) & (
         merged_contacts["source"] == "right_only"
     )
     merged_contacts.loc[
@@ -1341,7 +1342,7 @@ def _process_contacts(
     ].values
 
     # when both contacts are called by Shadow, go back to the lower distance
-    non_unique_called_in_both = (merged_contacts["epsilon_iso"] <= 0.5 * epsilon) & (
+    non_unique_called_in_both = (merged_contacts["epsilon_iso"] <= iso_energy_threshold * epsilon) & (
         merged_contacts["source"] == "both"
     )
 
