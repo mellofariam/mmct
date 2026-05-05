@@ -193,23 +193,35 @@ def _process_angles(
     if multibasin_root is None:
         raise ValueError("The XML tree is empty or malformed.")
 
-    for _, row in additional_top["angles"].iterrows():
+    if (
+        "th0(deg)" in additional_top["angles"].columns
+        and "Ka" in additional_top["angles"].columns
+    ):
+        additional_top["angles"].rename(columns={"th0(deg)": "th0_deg"}, inplace=True)  # inplace to save memory
+        has_thKa = True
+    else:
+        has_thKa = False
 
-        i = idx_from_additional_to_reference.get(row["ai"])
-        j = idx_from_additional_to_reference.get(row["aj"])
-        k = idx_from_additional_to_reference.get(row["ak"])
+    for row in additional_top["angles"].itertuples(index=False):
+
+        i = idx_from_additional_to_reference.get(row.ai)
+        j = idx_from_additional_to_reference.get(row.aj)
+        k = idx_from_additional_to_reference.get(row.ak)
 
         if i is not None and j is not None and k is not None:
             angles_converted_to_reference["ai"].append(i)
             angles_converted_to_reference["aj"].append(j)
             angles_converted_to_reference["ak"].append(k)
-            angles_converted_to_reference["func"].append(row["func"])
+            angles_converted_to_reference["func"].append(row.func)
 
-            if "th0(deg)" in row and "Ka" in row:
+            if has_thKa:
                 angles_converted_to_reference["th0(deg)"].append(
-                    row["th0(deg)"]
+                    row.th0_deg
                 )
-                angles_converted_to_reference["Ka"].append(row["Ka"])
+                angles_converted_to_reference["Ka"].append(row.Ka)
+    
+    if has_thKa:
+        additional_top["angles"].rename(columns={"th0_deg": "th0(deg)"}, inplace=True)
 
     df_angles_additional = pandas.DataFrame(
         data=angles_converted_to_reference
@@ -362,23 +374,25 @@ def _process_angles(
         ET.SubElement(flat_bottom_xml, "parameter").text = "theta1"
         ET.SubElement(flat_bottom_xml, "parameter").text = "theta2"
 
-        for _, row in merged_angles.iterrows():
+        merged_angles.rename(columns={"th0(deg)_1": "th0_deg_1", "th0(deg)_2": "th0_deg_2"}, inplace=True) # inplace to save memory
+        for row in merged_angles.itertuples():
 
-            theta1 = min(row["th0(deg)_1"], row["th0(deg)_2"])
-            theta2 = max(row["th0(deg)_1"], row["th0(deg)_2"])
+            theta1 = min(row.th0_deg_1, row.th0_deg_2)
+            theta2 = max(row.th0_deg_1, row.th0_deg_2)
 
             ET.SubElement(
                 flat_bottom_xml,
                 "interaction",
                 attrib={
-                    "i": str(row["ai"]),
-                    "j": str(row["aj"]),
-                    "k": str(row["ak"]),
-                    "Ka": f"{row['Ka']:.5e}",
+                    "i": str(row.ai),
+                    "j": str(row.aj),
+                    "k": str(row.ak),
+                    "Ka": f"{row.Ka:.5e}",
                     "theta1": f"{np.radians(theta1):.5e}",
                     "theta2": f"{np.radians(theta2):.5e}",
                 },
             )
+        merged_angles.rename(columns={"th0_deg_1": "th0(deg)_1", "th0_deg_2": "th0(deg)_2"}, inplace=True)
 
         if "angles" in multibasin_top:
             del multibasin_top["angles"]
@@ -424,22 +438,32 @@ def _process_bonds(
         col: [] for col in additional_top["bonds"].columns
     }
 
-    multibasin_root = multibasin_xml.getroot()
+    if (
+        "r0(nm)" in additional_top["bonds"].columns 
+        and "Kb" in additional_top["bonds"].columns
+    ):
+        additional_top["bonds"].rename(columns={"r0(nm)": "r0_nm"}, inplace=True)  # inplace to save memory
+        has_r0Kb = True 
+    else:
+        has_r0Kb = False
 
-    for _, row in additional_top["bonds"].iterrows():
+    for row in additional_top["bonds"].itertuples(index=False):
 
-        i = idx_from_additional_to_reference.get(row["ai"])
-        j = idx_from_additional_to_reference.get(row["aj"])
+        i = idx_from_additional_to_reference.get(row.ai)
+        j = idx_from_additional_to_reference.get(row.aj)
 
         if i is not None and j is not None:
             bonds_converted_to_reference["ai"].append(i)
             bonds_converted_to_reference["aj"].append(j)
-            bonds_converted_to_reference["func"].append(row["func"])
-            if "r0(nm)" in row and "Kb" in row:
+            bonds_converted_to_reference["func"].append(row.func)
+            if has_r0Kb:
                 bonds_converted_to_reference["r0(nm)"].append(
-                    row["r0(nm)"]
+                    row.r0_nm
                 )
-                bonds_converted_to_reference["Kb"].append(row["Kb"])
+                bonds_converted_to_reference["Kb"].append(row.Kb)
+
+    if has_r0Kb:
+        additional_top["bonds"].rename(columns={"r0_nm": "r0(nm)"}, inplace=True)
 
     df_bonds_additional = pandas.DataFrame(
         data=bonds_converted_to_reference
@@ -1821,10 +1845,11 @@ def remove_unstable_dihedrals(
     if (
         top is not None
         and "angles" in top
-        and "th0(deg)" in top["angles"]
+        and "th0(deg)" in top["angles"].columns
     ):
-        for row in top["angles"].itertuples():
-            if (row["th0(deg)"] <= 30) or (row["th0(deg)"] >= 150):
+        top["angles"].rename(columns={"th0(deg)": "th0_deg"}, inplace=True) # inplace to save memory
+        for row in top["angles"].itertuples(index=False):
+            if (row.th0_deg <= 30) or (row.th0_deg >= 150):
                 idx_in_faulty_angles.add(
                     _strlist2tuple(
                         row.ai,
@@ -1832,6 +1857,7 @@ def remove_unstable_dihedrals(
                         row.ak,
                     )
                 )
+        top["angles"].rename(columns={"th0_deg": "th0(deg)"}, inplace=True)
 
     for dihedral_type in root.findall(".//dihedrals/dihedrals_type"):
         modified_dihedrals = []
