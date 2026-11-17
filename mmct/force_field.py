@@ -1540,18 +1540,31 @@ def scale_contacts(
     atom_pairs: np.ndarray,
     scale_by: float | None = None,
     scale_to: float | None = None,
+    lennard_jones_powers: tuple[int, int] = (10, 12)
 ) -> ET.ElementTree:
     """
-    Scales the contact strength in the XML file by a given scale factor.
+    Scale the well depths of selected Lennard-Jones contacts.
+
+    Provide exactly one of `scale_by` and `scale_to`. Both options apply
+    the same multiplier to a contact's A and B coefficients, preserving
+    its equilibrium distance up to coefficient rounding.
 
     Args:
-        xml (ET.ElementTree): The XML tree containing contact information.
-        atom_pairs (np.ndarray): Array of atom pairs for which contacts are defined.
-        scale_by (float): Factor by which to scale the contact distances.
+        xml: XML tree containing the contact interactions.
+        atom_pairs: Atom index pairs to scale, in either order.
+        scale_by: Positive multiplier for the existing well depths.
+        scale_to: Positive target well depth in the potential's energy units.
+        lennard_jones_powers: Attraction exponent n and repulsion exponent m
+            for the existing XML potential A/r**m - B/r**n. Defaults to
+            (10, 12). Use (6, 12) for a 6-12 contact. The exponents are used
+            to calculate the well depth for `scale_to`.
 
     Returns:
-        ET.ElementTree: The modified XML tree with scaled contacts.
+        A copy of the XML tree with the selected coefficients scaled.
     """
+
+    attraction_power, repulsion_power = lennard_jones_powers
+
     if scale_by is not None and scale_to is not None:
         raise ValueError(
             "Only one of `scale_by` or `scale_to` should be provided."
@@ -1559,9 +1572,22 @@ def scale_contacts(
     if scale_to is not None and scale_by is None:
         if scale_to <= 0:
             raise ValueError("`scale_to` must be greater than zero.")
-        scale = lambda x: scale_to
+
+        def factor(A, B):
+            equilibrium_distance = (
+                repulsion_power * A / (attraction_power * B)
+            ) ** (1 / (repulsion_power - attraction_power))
+            current_depth = (
+                (1 - attraction_power / repulsion_power)
+                * B
+                / (equilibrium_distance**attraction_power)
+            )
+
+            return scale_to / current_depth
+
     elif scale_to is None and scale_by is not None:
-        scale = lambda x: scale_by * float(x)
+        def factor(A, B):
+            return scale_by
     else:
         raise ValueError(
             "Either `scale_by` or `scale_to` must be provided."
@@ -1587,13 +1613,12 @@ def scale_contacts(
             i = int(interaction.attrib["i"])
             j = int(interaction.attrib["j"])
 
+            A = float(interaction.attrib["A"])
+            B = float(interaction.attrib["B"])
+
             if tuple(sorted([i, j])) in contacts_to_scale:
-                interaction.attrib["A"] = (
-                    f"{scale(interaction.attrib['A']):.5e}"
-                )
-                interaction.attrib["B"] = (
-                    f"{scale(interaction.attrib['B']):.5e}"
-                )
+                interaction.attrib["A"] = f"{A * factor(A, B):.5e}"
+                interaction.attrib["B"] = f"{B * factor(A, B):.5e}"
 
     return edited_xml
 
